@@ -15,18 +15,18 @@
 #include "iden.h"
 #include "compute_prop.h"
 #include "colores.h"
+#include "peano.h"
 #include "grid.h"
 
-void linkedlist_grupos(int *head, unsigned int *npgrupo,
-                int npart, int *ll, unsigned int *grupo);
+void linkedlist_grupos(int ngrupos, int *head, unsigned int *npgrupo, int npart, int *ll, unsigned int *grupo);
 void linkedlist();
 void sub_groups(void);
 void fof_groups(void);
 
 int main(int argc, char **argv){
-  unsigned int i;
-  int          init_ifrac,ifrac;
-  double       frac,start,end;
+  int    i,l;
+  int    init_ifrac,ifrac;
+  double frac,start,end;
 
   TIMER(start);
   
@@ -59,6 +59,8 @@ int main(int argc, char **argv){
   /*Cambia origen de coordenadas*/
   change_positions(cp.npart);
 
+  peano_hilbert();
+
   #ifdef COMPUTE_EP
   /*Calcula energia potencial de las particulas*/
   compute_potential_energy();
@@ -80,7 +82,7 @@ int main(int argc, char **argv){
   #endif
 
   for(ifrac = init_ifrac; ifrac <= nfrac; ifrac++){
-    fprintf(stdout, "\n Begins Identification : Step %d of %d \n",ifrac,nfrac);
+    fprintf(stdout, "\nBegins Identification : Step %d of %d \n",ifrac,nfrac);
     
     frac  = 1.0f/(float)(nfrac + 1);
     frac *= (float)(nfrac + 1 - ifrac);
@@ -88,18 +90,6 @@ int main(int argc, char **argv){
     iden.r0  = frac;
     iden.r0 *= 0.2;
     iden.r0 *= cbrt(cp.Mpart*1.0E10/cp.omegam/RHOCRIT)*1000.0;
-
-    if(ifrac == 0){
-      iden.r0 = 0.7937;
-      iden.r0 *= cbrt(cp.Mpart*1.0E10/cp.omegam/RHOCRIT)*1000.0;
-    }
-    if(ifrac == 1){
-      iden.r0 = 0.17071;
-      iden.r0 *= cbrt(cp.Mpart*1.0E10/cp.omegam/RHOCRIT)*1000.0;
-    }
-    if(ifrac > 1){
-      exit(EXIT_SUCCESS);
-    }
 
     if(iden.r0 <= cp.soft){
       iden.r0 = cp.soft;
@@ -120,19 +110,17 @@ int main(int argc, char **argv){
     else
       sub_groups();
     #endif
-
+    
     #ifdef GETPOSITIONS
     get_positions(ifrac);
     #endif
-
-    free(Temp.grup);
+    
     free(Temp.head);
     free(Temp.npgrup);
     free(Temp.ll);
   }
 
   /************* TERMINO LA IDENTIFICACION ***************/
-
   #ifndef READIDENFOF
   write_idenfof(fof_file);
   #endif
@@ -141,11 +129,14 @@ int main(int argc, char **argv){
   write_idensub(sub_file);
   #endif
 
-  #if defined(COMPUTE_PROPERTIES)
+  #ifdef COMPUTE_FOF_PROPERTIES
   PROP_FOF = true;
   compute_properties(fof);
   PROP_FOF = false;
+  #endif
+
   #ifdef IDENSUB
+  #ifdef COMPUTE_SUB_PROPERTIES
   PROP_SUB = true;
   compute_properties(sub);
   PROP_SUB = false;
@@ -167,7 +158,7 @@ int main(int argc, char **argv){
 }
 
 void linkedlist(){
-  unsigned int i;
+  int i;
   int g;
 
   Temp.head   = (int *) malloc(iden.ngrupos*sizeof(int));
@@ -191,7 +182,7 @@ void linkedlist(){
 
 }
 
-void linkedlist_grupos(int *head, unsigned int *npgrupo,
+void linkedlist_grupos(int ngrupos, int *head, unsigned int *npgrupo,
                 int npart, int *ll, unsigned int *grupo){
   int i;
   unsigned int g;
@@ -205,7 +196,7 @@ void linkedlist_grupos(int *head, unsigned int *npgrupo,
 }
 
 void fof_groups(void){
-  unsigned int i;
+  int i;
 
   n_grupos_fof = iden.ngrupos;
 
@@ -256,7 +247,7 @@ void fof_groups(void){
 
 #ifdef IDENSUB
 void sub_groups(void){
-  unsigned int i, mysub;
+  int i, mysub;
   unsigned int contador_subgrupo;
 
   if(iden.ngrupos != 0)

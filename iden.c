@@ -9,7 +9,9 @@
 #include "cosmoparam.h"
 #include "grid.h"
 #include "iden.h"
-#include "bitmask.h"
+
+//#define FOF_MARIO
+
 
 struct global_head_st{
   item *head;
@@ -17,22 +19,16 @@ struct global_head_st{
 };
 
 void identification(void){
-  unsigned int nvec;
-  int  nthreads, tid;
-  int  i,j,ngrupo;
-  item *tmp,*tmp1;
-  item *curr,*head;
-  int *test;
-  type_real zmin,zmax,zcm;
-  int nn;
-  int *grupos_per_thread;
-  void *puntero;
-  int ntotal;
-  struct global_head_st **global_head;
-  struct global_head_st *curr_global_head;
+  int       i,nthreads,tid;
+  bool      *test;
+  int *Padre, *Size;
+  int *Start, *End;
+  int ngrid_old = grid.ngrid;
 
-  unsigned long ngrid_old = grid.ngrid;
   grid.ngrid = (int)(cp.lbox/iden.r0);
+  test = (bool *) malloc(cp.npart*sizeof(bool));
+  Padre = (int *) malloc(cp.npart*sizeof(int));
+  Size = (int *)  malloc(cp.npart*sizeof(int));
 
   if(grid.ngrid > NGRIDMAX){
     fprintf(stdout,"Using NGRIDMAX = %d\n",NGRIDMAX);
@@ -41,7 +37,8 @@ void identification(void){
 
   grid.nobj = iden.nobj;
 
-  if(ngrid_old != grid.ngrid){
+  if(ngrid_old != grid.ngrid)
+  {
     grid_free();
     grid_init();
     grid_build();
@@ -49,148 +46,139 @@ void identification(void){
 
   iden.r0 = iden.r0*iden.r0;
 
-  for(i = 0; i < iden.nobj; i++)
-    P[i].gr = 0;
-
   #ifdef NTHREADS
   omp_set_dynamic(0);
   omp_set_num_threads(NTHREADS);
   #endif
+  
+  for(i=0;i<cp.npart;i++)
+  { 
+    Padre[i] = i;
+    Size[i] = 0;
+    test[i] = false;
+    P[i].gr = 0;
+  }
 
   fprintf(stdout,"Comienza identificacion.....\n");
   iden.ngrupos = 0;
 
-  ntotal = 0; ngrupo = 0;
-#pragma omp parallel default(none) reduction(+:ntotal) \
-  private(head,curr,nvec,tmp,tmp1,test,tid,i,zcm,nn,   \
-          curr_global_head,puntero,j,zmin,zmax,nthreads) \
-  shared(P,iden,global_head,cp,grupos_per_thread,ngrupo)                     
-{
-  tid = omp_get_thread_num();
+  #pragma omp parallel default(none) private(tid,i) \
+  shared(P,iden,nthreads,Start,End,cp,Padre,stdout,test)   
+  {
 
-  nthreads = omp_get_num_threads();
-  zmin = (type_real)tid*cp.lbox/(type_real)nthreads;
-  zmax = (type_real)(tid+1)*cp.lbox/(type_real)nthreads;
+    tid = omp_get_thread_num();
 
-  if(tid == 0){
-    printf("\nRunning on %d threads\n",nthreads);
-    grupos_per_thread = (int *) malloc(nthreads*sizeof(int));
-    global_head = (struct global_head_st **) malloc(nthreads*sizeof(struct global_head_st *));
-  }
-  #pragma omp barrier
-
-  test = (int *) calloc(iden.nobj/32 + 1,sizeof(int));
-
-  global_head[tid] = NULL;
-  for(i =0; i < iden.nobj; i++){
-    if(TestBit(test,i))continue;
-    if(P[i].Pos[2] < zmin || P[i].Pos[2] >= zmax) continue;
-
-    SetBit(test,i);
-
-    head = (item *) malloc(sizeof(item));
-    head->indx = i;
-    head->next = NULL;
-
-    curr = head;
-    while(curr){
-      tmp = curr->next;
-      tmp1 = curr;
-
-      nvec = 0;
-      busv(&curr, &nvec, test);
-
-      curr->next = tmp;
-      curr = tmp1->next;
-    }
-
-    zcm = 0.0; nn = 0;
-    curr = head;
-    while(curr){
-      zcm += P[curr->indx].Pos[2]; 
-      nn++;
-
-      curr = curr->next;
-    }
-    zcm /= (type_real)nn;
-
-    if(zcm < zmin || zcm >= zmax || nn < NPARTMIN){
-      curr = head;
-      while(curr){
-        puntero = curr->next;
-        free(curr);
-        curr = puntero;
+    if(tid == 0)
+    {
+      nthreads = omp_get_num_threads();
+      printf("\nRunning on %d threads\n",nthreads);
+      nthreads = 1024;
+ 
+      Start = (int *) malloc(nthreads*sizeof(int));
+      End = (int *) malloc(nthreads*sizeof(int));
+ 
+      for(i=0;i<nthreads;i++)
+      {
+        Start[i] = i==0 ? 0 : i*floor((float)cp.npart/nthreads);
+        End[i] = i==nthreads-1 ? cp.npart : (i+1)*floor((float)cp.npart/nthreads);
       }
-    }else{
-      ntotal++;
-      curr_global_head = (struct global_head_st *) malloc(sizeof(struct global_head_st));
-      assert(curr_global_head != NULL);
-      curr_global_head->head = head;
-      curr_global_head->global_next = global_head[tid];
-      global_head[tid] = curr_global_head;
+    }
+
+    #pragma omp barrier
+
+    //#pragma omp for schedule(guided,32)
+    #pragma omp for schedule(static)
+    for(tid=0;tid<nthreads;tid++)
+      for(i=Start[tid];i<End[tid];i++)
+      {
+
+        if(test[i]) continue;  // Salta a la siguiente
+
+        if(i%100000==0){printf("%i\r",i);fflush(stdout);}
+
+        test[i] = true;
+        busv_rec(i,Padre,test);
+      }
+
+  }  /****** TERMINA SECCION PARALELA ****************************/
+
+  for(i=0;i<cp.npart;i++)
+  {
+    Padre[i] = Raiz(i,Padre);
+    Size[Padre[i]]++;
+  }
+
+  for(i=0; i<cp.npart; i++)
+  {
+    if(Padre[i]==i && Size[i]>1)
+    {
+      iden.ngrupos++;
+      P[i].gr = iden.ngrupos;
     }
   }
-  grupos_per_thread[tid] = ntotal;
-  printf("tid %d ntotal %d\n",tid,ntotal);
+   
+  for(i=0; i<cp.npart; i++)
+  {
+    P[i].gr = P[Padre[i]].gr; 
+  } 
+  
+  iden.ngrupos+=1;
+  free(Padre);
+  free(Size);
   free(test);
-  #pragma omp barrier
 
-  /***** RENOMBRA *****/
-  #pragma omp for schedule(dynamic)
-  for(tid = 0; tid < nthreads; tid++){
-    ntotal = 0;
-    curr_global_head = global_head[tid];
-    while(curr_global_head){
-      ntotal++;
-      head = curr_global_head->head;
-      if(P[head->indx].gr == 0){
-        #pragma omp critical
-        {ngrupo++;j = ngrupo;}
-        #ifdef DEBUG
-        i = 0;
-        #endif
-        curr = head;
-        while(curr){
-          #ifdef DEBUG
-          i++;
-          assert(P[curr->indx].gr == 0);
-          #endif
-          P[curr->indx].gr = j;
-          curr = curr->next;
-        }
-        #ifdef DEBUG
-        assert(i >= NPARTMIN);
-        #endif
-      }
-      curr_global_head = curr_global_head->global_next;
-    }
-    //assert(ntotal == grupos_per_thread[tid]);
-
-    curr_global_head = global_head[tid];
-    while(curr_global_head){
-      curr = curr_global_head->head;
-      while(curr){
-        puntero = curr->next;
-        free(curr);
-        curr = puntero;
-      }
-      puntero = curr_global_head->global_next;
-      free(curr_global_head);
-      curr_global_head = puntero;
-    }
-  }
-}
-  /****** TERMINA SECCION PARALELA ****************************/
-
-  /*Le sumamos 1 para contar el grupo 0*/
-  iden.ngrupos = ngrupo + 1;
-  free(global_head);
-  free(grupos_per_thread);
   fprintf(stdout,"Nro. grupos identificados = %d\n",iden.ngrupos);
   fprintf(stdout,"Termino identificacion\n"); fflush(stdout);
+
 }
 
-void busv(item **curr, unsigned int *nvec, int *test){
+int Raiz(int i, int *Padre)
+{
+
+ if(i != Padre[i])
+   Padre[i] = Raiz(Padre[i],Padre);
+
+ return Padre[i];
+
+}
+
+void Unir(int u, int v, int *Padre)
+{
+  int z;
+
+  while(Padre[u] != Padre[v])
+  { 
+      if(Padre[u] < Padre[v])
+      {
+
+          if(u == Padre[u]){
+              Padre[u] = Padre[v];   
+              break;             
+          }
+
+          z = Padre[u];   
+          Padre[u] = Padre[v];   
+          u = z;
+
+      }else{
+
+          if(v == Padre[v]){
+              Padre[v] = Padre[u];   
+              break;             
+          }
+
+          z = Padre[v];   
+          Padre[v] = Padre[u];   
+          v = z;
+      }
+  }
+
+  return;
+}
+
+void busv_rec(int ic, int *Padre, bool *test)
+{
+
   long ixc, iyc, izc;
   long ixci, iyci, izci;
   long ixcf, iycf, izcf;
@@ -200,21 +188,16 @@ void busv(item **curr, unsigned int *nvec, int *test){
   type_real xx, yy, zz;
   type_real dis;
   int i;
-  type_real lbox,fac;
+  type_real lbox,fac,lbox2;
   long ngrid;
-  int ic;
   item *tmp, *clone;
   unsigned int count;
 
-  clone = *curr;
-  ic = clone->indx;
 
   ngrid = grid.ngrid;
   lbox  = cp.lbox;
   fac   = (type_real)ngrid/lbox;
-  #ifdef PERIODIC
-  type_real lbox2 = lbox/2.0;
-  #endif
+  lbox2 = lbox/2.0;
 
   ixc  = (int)(P[ic].Pos[0]*fac);
   ixci = ixc - 1;
@@ -259,17 +242,21 @@ void busv(item **curr, unsigned int *nvec, int *test){
         ibox = (ix * ngrid + iy) * ngrid + iz ;
 
         i = grid.llirst[ibox];
-        while(i != -1){
+
+        while(i != -1)
+        {
           #ifdef IDENSUB
           if(P[i].sub != P[ic].sub){
             i = grid.ll[i];
             continue;
           }
           #endif
-          if(TestBit(test,i)){
+
+          if(test[i] == true)
+          {
             i = grid.ll[i];
             continue;
-          }
+          }      
 
           xx = P[i].Pos[0] - P[ic].Pos[0];
           yy = P[i].Pos[1] - P[ic].Pos[1];
@@ -286,21 +273,16 @@ void busv(item **curr, unsigned int *nvec, int *test){
 
           dis = xx*xx + yy*yy + zz*zz;
 
-          if(dis < iden.r0){
-            SetBit(test,i);
+          if(dis < iden.r0)
+          {
+              //#pragma omp critical
+              Unir(ic,i,Padre);
 
-            tmp = (item *) malloc(sizeof(item));
-            #ifdef DEBUG
-            assert(tmp != NULL);
-            #endif
-
-            tmp->indx = i;
-            tmp->next = NULL;
-
-            clone->next = tmp;
-            clone = tmp;
-
-            count++;
+              if(i>ic)
+              {
+               test[i] = true;
+               busv_rec(i,Padre,test);
+              }
           }
 
           i = grid.ll[i];
@@ -310,6 +292,5 @@ void busv(item **curr, unsigned int *nvec, int *test){
     } /*fin iyy*/
   } /*fin ixx*/
 
-  *curr = clone;
-  *nvec += count;
+  return 0;
 }
