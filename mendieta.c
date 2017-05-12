@@ -19,13 +19,12 @@
 #include "grid.h"
 
 void linkedlist_grupos(int ngrupos, int *head, unsigned int *npgrupo, int npart, int *ll, unsigned int *grupo);
-void linkedlist();
 void sub_groups(void);
 void fof_groups(void);
 
-int main(int argc, char **argv){
-  int    i,l;
-  int    init_ifrac,ifrac;
+int main(int argc, char **argv)
+{
+  int    i,init_ifrac,ifrac;
   double frac,start,end;
 
   TIMER(start);
@@ -91,7 +90,14 @@ int main(int argc, char **argv){
     iden.r0 *= 0.2;
     iden.r0 *= cbrt(cp.Mpart*1.0E10/cp.omegam/RHOCRIT)*1000.0;
 
-    if(iden.r0 <= cp.soft){
+    #ifdef READIDENFOF
+    iden.step  = 0;
+    #else
+    iden.step  = ifrac;
+    #endif
+
+    if(iden.r0 <= cp.soft)
+    {
       iden.r0 = cp.soft;
       ifrac = nfrac;
     }
@@ -99,10 +105,8 @@ int main(int argc, char **argv){
     fprintf(stdout,"Linking length = %f \n",iden.r0);
 
     iden.nobj = cp.npart;
-    
-    identification();
 
-    linkedlist();
+    identification();
 
     if(ifrac == 0)
       fof_groups();
@@ -157,37 +161,14 @@ int main(int argc, char **argv){
   return(EXIT_SUCCESS);
 }
 
-void linkedlist(){
-  int i;
-  int g;
-
-  Temp.head   = (int *) malloc(iden.ngrupos*sizeof(int));
-  Temp.npgrup = (unsigned int *) malloc(iden.ngrupos*sizeof(unsigned int));
-  Temp.ll     = (int *) malloc(iden.nobj*sizeof(int));
-
-  for(i = 0; i < iden.ngrupos; i++){
-    Temp.head[i] = -1;
-    Temp.npgrup[i] = 0;
-  }
-
-  for(i = 0; i < iden.nobj; i++){
-    g = P[i].gr;
-    #ifdef DEBUG
-    assert((g >= 0) && (g < iden.ngrupos));
-    #endif
-    Temp.ll[i] = Temp.head[g];
-    Temp.head[g] = i;
-    Temp.npgrup[g]++;
-  }
-
-}
-
 void linkedlist_grupos(int ngrupos, int *head, unsigned int *npgrupo,
-                int npart, int *ll, unsigned int *grupo){
+                int npart, int *ll, unsigned int *grupo)
+                {
   int i;
   unsigned int g;
   
-  for(i = 0; i < npart; i++){
+  for(i = 0; i < npart; i++)
+  {
     g = grupo[i];
     ll[i] = head[g];
     head[g] = i;
@@ -215,7 +196,8 @@ void fof_groups(void){
     limpieza_new(i,0);
   #endif
 
-  for(i = 0; i < iden.ngrupos; i++){
+  for(i = 0; i < iden.ngrupos; i++)
+  {
     fof[i].llirst = -1;
     fof[i].np     =  0;
     #ifdef IDENSUB
@@ -246,7 +228,8 @@ void fof_groups(void){
 }
 
 #ifdef IDENSUB
-void sub_groups(void){
+void sub_groups(void)
+{
   int i, mysub;
   unsigned int contador_subgrupo;
 
@@ -260,7 +243,8 @@ void sub_groups(void){
   sub = (struct grupos *) malloc(n_grupos_sub*sizeof(struct grupos));
   assert(sub != NULL);
 
-  for(i = 0; i < n_grupos_sub; i++){
+  for(i = 0; i < n_grupos_sub; i++)
+  {
     sub[i].llirst = -1;
     sub[i].np = 0;
   }
