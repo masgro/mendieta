@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <math.h>
 #include <assert.h>
-#include <stdbool.h>
 #include <omp.h>
 
 #include "variables.h"
