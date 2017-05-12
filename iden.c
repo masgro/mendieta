@@ -2,181 +2,202 @@
 #include <stdio.h>
 #include <assert.h>
 #include <math.h>
-#include <stdbool.h>
 #include <omp.h>
 
 #include "variables.h"
 #include "cosmoparam.h"
 #include "grid.h"
 #include "iden.h"
+#include "bitmask.h"
+#include "limpieza.h"
 
-//#define FOF_MARIO
-
-
-struct global_head_st{
-  item *head;
-  struct global_head_st *global_next;
-};
-
-void identification(void){
-  int       i,nthreads,tid;
-  bool      *test;
-  int *Padre, *Size;
-  int *Start, *End;
+void identification(void)
+{
+  int i, nthreads, tid;
+  int *test, *Size;
   int ngrid_old = grid.ngrid;
+  #ifdef LOCK
+  omp_lock_t *lock; lock = (omp_lock_t *) malloc(cp.npart*sizeof(omp_lock_t));
+  #endif
 
   grid.ngrid = (int)(cp.lbox/iden.r0);
-  test = (bool *) malloc(cp.npart*sizeof(bool));
-  Padre = (int *) malloc(cp.npart*sizeof(int));
-  Size = (int *)  malloc(cp.npart*sizeof(int));
+  Size = (int *) calloc(cp.npart,sizeof(int));
+  test = (int *) calloc(cp.npart/32 + 1,sizeof(int));
 
   if(grid.ngrid > NGRIDMAX){
     fprintf(stdout,"Using NGRIDMAX = %d\n",NGRIDMAX);
     grid.ngrid = NGRIDMAX;
   }
-
+  
   grid.nobj = iden.nobj;
+  grid.step = iden.step;
 
-  if(ngrid_old != grid.ngrid)
+  if(ngrid_old != grid.ngrid || iden.step==1)
   {
     grid_free();
     grid_init();
     grid_build();
   }
 
-  iden.r0 = iden.r0*iden.r0;
+  iden.r0 *= iden.r0;
 
   #ifdef NTHREADS
   omp_set_dynamic(0);
   omp_set_num_threads(NTHREADS);
   #endif
-  
-  for(i=0;i<cp.npart;i++)
-  { 
-    Padre[i] = i;
-    Size[i] = 0;
-    test[i] = false;
-    P[i].gr = 0;
-  }
-
+    
   fprintf(stdout,"Comienza identificacion.....\n");
-  iden.ngrupos = 0;
 
-  #pragma omp parallel default(none) private(tid,i) \
-  shared(P,iden,nthreads,Start,End,cp,Padre,stdout,test)   
+  printf("\nRunning on %d threads\n",NTHREADS);
+  //nthreads = iden.step == 0 ? (1024<<NTHREADS) : (1024<<NTHREADS)/(2<<iden.step); printf("chunks %d for threads\n",nthreads);
+
+  #ifdef LOCK
+    #pragma omp parallel default(none) private(tid,i) \
+    shared(P,iden,nthreads,cp,test,Size,lock,stdout)   
+  #else
+    #pragma omp parallel default(none) private(tid,i) \
+    shared(P,iden,nthreads,cp,test,Size,stdout)   
+  #endif
   {
-
-    tid = omp_get_thread_num();
-
-    if(tid == 0)
+    tid = omp_get_thread_num(); 
+    nthreads = omp_get_num_threads();
+    
+    for(i = tid*floor((float)cp.npart/NTHREADS);
+    i<(tid==NTHREADS-1 ? cp.npart : (tid+1)*floor((float)cp.npart/NTHREADS));
+    i++)
     {
-      nthreads = omp_get_num_threads();
-      printf("\nRunning on %d threads\n",nthreads);
-      nthreads = 1024;
- 
-      Start = (int *) malloc(nthreads*sizeof(int));
-      End = (int *) malloc(nthreads*sizeof(int));
- 
-      for(i=0;i<nthreads;i++)
-      {
-        Start[i] = i==0 ? 0 : i*floor((float)cp.npart/nthreads);
-        End[i] = i==nthreads-1 ? cp.npart : (i+1)*floor((float)cp.npart/nthreads);
-      }
+      P[i].gr = i;
+      if(iden.step!=0 && P[i].sub == 0)
+       SetBit(test,i);     
+      #ifdef LOCK
+       omp_init_lock(&(lock[i]));
+      #endif
     }
 
     #pragma omp barrier
-
-    //#pragma omp for schedule(guided,32)
-    #pragma omp for schedule(static)
-    for(tid=0;tid<nthreads;tid++)
-      for(i=Start[tid];i<End[tid];i++)
+    
+    //#pragma omp for schedule(dynamic)
+    //#pragma omp for schedule(static)
+    //#pragma omp for schedule(guided)
+    //for(tid=0;tid<nthreads;tid++)
+      for(i = tid*floor((float)cp.npart/nthreads);
+      i<(tid==nthreads-1 ? cp.npart : (tid+1)*floor((float)cp.npart/nthreads));
+      i++)
       {
 
-        if(test[i]) continue;  // Salta a la siguiente
-
-        if(i%100000==0){printf("%i\r",i);fflush(stdout);}
-
-        test[i] = true;
-        busv_rec(i,Padre,test);
+        if(TestBit(test,i)) continue ;  // Salta a la siguiente
+       
+        SetBit(test,i);
+        
+        #ifdef LOCK
+        busv_rec(i,test,lock);
+        #else
+        busv_rec(i,test);
+        #endif
       }
 
   }  /****** TERMINA SECCION PARALELA ****************************/
 
-  for(i=0;i<cp.npart;i++)
-  {
-    Padre[i] = Raiz(i,Padre);
-    Size[Padre[i]]++;
-  }
+  fprintf(stdout,"Sale del paralelo\n"); fflush(stdout);
 
-  for(i=0; i<cp.npart; i++)
-  {
-    if(Padre[i]==i && Size[i]>1)
-    {
-      iden.ngrupos++;
-      P[i].gr = iden.ngrupos;
-    }
-  }
-   
-  for(i=0; i<cp.npart; i++)
-  {
-    P[i].gr = P[Padre[i]].gr; 
-  } 
-  
-  iden.ngrupos+=1;
-  free(Padre);
+  #ifdef LOCK
+  for(i=0;i<cp.npart;i++) omp_destroy_lock(&(lock[i]));
+  free(lock);
+  #endif
+
+  linkedlist(test);
+
   free(Size);
   free(test);
 
-  fprintf(stdout,"Nro. grupos identificados = %d\n",iden.ngrupos);
   fprintf(stdout,"Termino identificacion\n"); fflush(stdout);
 
 }
 
-int Raiz(int i, int *Padre)
+int Raiz(int i)
 {
 
- if(i != Padre[i])
-   Padre[i] = Raiz(Padre[i],Padre);
+ if(i != P[i].gr)
+   P[i].gr = Raiz(P[i].gr);
 
- return Padre[i];
+ return P[i].gr;
 
 }
 
-void Unir(int u, int v, int *Padre)
+#ifdef LOCK
+void Unir(int u, int v, omp_lock_t *lock)
+#else
+void Unir(int u, int v)
+#endif
 {
   int z;
 
-  while(Padre[u] != Padre[v])
+  while(P[u].gr != P[v].gr)
   { 
-      if(Padre[u] < Padre[v])
+      if(P[u].gr < P[v].gr)
       {
-
-          if(u == Padre[u]){
-              Padre[u] = Padre[v];   
-              break;             
+#ifdef LOCK
+          if(u == P[u].gr)
+          {
+            omp_set_lock(&(lock[u]));
+            z = 0;
+            if(u == P[u].gr)
+            {
+                P[u].gr = P[v].gr;  
+                z = 1;
+            }
+            omp_unset_lock(&(lock[u]));
+            if(z==1) break;             
           }
-
-          z = Padre[u];   
-          Padre[u] = Padre[v];   
+#else
+          if(u == P[u].gr)
+          {
+            P[u].gr = P[v].gr;  
+            break;             
+          }
+#endif
+          
+          z = P[u].gr;   
+          P[u].gr = P[v].gr;
           u = z;
 
       }else{
-
-          if(v == Padre[v]){
-              Padre[v] = Padre[u];   
+#ifdef LOCK
+          if(v == P[v].gr)
+          {
+            omp_set_lock(&(lock[v]));
+            z = 0;
+            if(v == P[v].gr)
+            {
+                P[v].gr = P[u].gr;   
+                z = 1;
+            }
+            omp_unset_lock(&(lock[v]));
+            if(z == 1) break;            
+          }
+#else
+          if(v == P[v].gr)
+          {
+              P[v].gr = P[u].gr;   
               break;             
           }
+#endif
 
-          z = Padre[v];   
-          Padre[v] = Padre[u];   
+          z = P[v].gr;   
+          P[v].gr = P[u].gr;   
           v = z;
+
       }
   }
 
   return;
 }
 
-void busv_rec(int ic, int *Padre, bool *test)
+#ifdef LOCK
+void busv_rec(int ic, int *test, omp_lock_t *lock)
+#else
+void busv_rec(int ic, int *test)
+#endif
 {
 
   long ixc, iyc, izc;
@@ -190,8 +211,6 @@ void busv_rec(int ic, int *Padre, bool *test)
   int i;
   type_real lbox,fac,lbox2;
   long ngrid;
-  item *tmp, *clone;
-  unsigned int count;
 
 
   ngrid = grid.ngrid;
@@ -218,12 +237,11 @@ void busv_rec(int ic, int *Padre, bool *test)
   if( izcf >= ngrid ) izcf = ngrid - 1;
   #endif
 
-  count = 0;
   for(ixx = ixci; ixx <= ixcf; ixx++){
     ix = ixx;
     #ifdef PERIODIC
     if(ix >= ngrid) ix = ix - ngrid;
-    if(ix < 0) ix = ix + ngrid;
+     if(ix < 0) ix = ix + ngrid;
     #endif
     for( iyy = iyci ; iyy <= iycf ; iyy++){
       iy = iyy;
@@ -251,8 +269,8 @@ void busv_rec(int ic, int *Padre, bool *test)
             continue;
           }
           #endif
-
-          if(test[i] == true)
+ 
+          if(TestBit(test,i))
           {
             i = grid.ll[i];
             continue;
@@ -275,14 +293,20 @@ void busv_rec(int ic, int *Padre, bool *test)
 
           if(dis < iden.r0)
           {
-              //#pragma omp critical
-              Unir(ic,i,Padre);
-
-              if(i>ic)
-              {
-               test[i] = true;
-               busv_rec(i,Padre,test);
-              }
+#ifdef LOCK
+             Unir(ic,i,lock);
+#else
+             Unir(ic,i);
+#endif
+             if(i>ic)
+             {
+              SetBit(test,i);
+#ifdef LOCK
+              busv_rec(i,test,lock);
+#else
+              busv_rec(i,test);
+#endif
+             }
           }
 
           i = grid.ll[i];
@@ -292,5 +316,65 @@ void busv_rec(int ic, int *Padre, bool *test)
     } /*fin iyy*/
   } /*fin ixx*/
 
-  return 0;
+}
+
+void linkedlist(int *test)
+{
+  int i,g;
+
+  Temp.ll = (int *) calloc(cp.npart,sizeof(int));
+
+  iden.ngrupos = 0;
+  for(i=0;i<cp.npart;i++)
+  {
+    P[i].gr = Raiz(i);
+    if(TestBit(test,P[i].gr))
+    {
+      Temp.ll[P[i].gr]++;
+      if(Temp.ll[P[i].gr]>=NPARTMIN)
+      { 
+        iden.ngrupos++;
+        Temp.ll[P[i].gr] = iden.ngrupos;
+        ClearBit(test,P[i].gr);
+      }
+    }
+  }
+
+  iden.ngrupos++;  // SUMA UNO;
+
+  Temp.head   = (int *) malloc(iden.ngrupos*sizeof(int));
+  Temp.npgrup = (unsigned int *) malloc(iden.ngrupos*sizeof(unsigned int));
+
+  for(i=0;i<cp.npart;i++)
+  {
+    //if(TestBit(test,P[i].gr))
+    //{ 
+    //  Temp.ll[P[i].gr] = 0;
+    //  ClearBit(test,P[i].gr);
+    //}
+
+    //P[i].gr = Temp.ll[P[i].gr];
+    if(TestBit(test,P[i].gr))
+      P[i].gr = 0;
+    else
+      P[i].gr = Temp.ll[P[i].gr];
+
+    if(i<iden.ngrupos)
+    {
+      Temp.head[i] = -1;
+      Temp.npgrup[i] = 0;
+    }
+  }
+
+  for(i=0;i<cp.npart;i++)
+  {
+    g = P[i].gr;
+
+    #ifdef DEBUG
+    assert((g >= 0) && (g < iden.ngrupos));
+    #endif
+    Temp.ll[i] = Temp.head[g];
+    Temp.head[g] = i;
+    Temp.npgrup[g]++;
+  }
 }

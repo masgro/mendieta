@@ -9,39 +9,25 @@
 
 void peano_hilbert()
 {
-  int i, Tid;
+  int i;
   type_real DomainFac = 1.0 / (cp.lbox*1.001) * (((peanokey) 1) << (BITS_PER_DIMENSION));
-  peanokey *Min, MinTot;
+  peanokey MinTot;
 
   peanokey *Key;            /*!< a table used for storing Peano-Hilbert keys for particles */
 
   Key = (peanokey *) malloc(sizeof(peanokey)*cp.npart);
   
-  Min = (peanokey *) malloc(sizeof(peanokey)*NTHREADS);
   MinTot = (((peanokey)1)<<(3*BITS_PER_DIMENSION));
 
-  for(i=0;i<NTHREADS;i++) 
-    Min[i] = MinTot;  
-
-  #pragma omp parallel for num_threads(NTHREADS) schedule(static) \
-  default(none) private(Tid) shared(Key,Min,P,cp,DomainFac)
   for(i=0;i<cp.npart;i++) 
   {
-    Tid = omp_get_thread_num();
     Key[i] = peano_hilbert_key(P[i].Pos[0]*DomainFac,P[i].Pos[1]*DomainFac,P[i].Pos[2]*DomainFac,BITS_PER_DIMENSION);  
-    Min[Tid] = Key[i] < Min[Tid] ? Key[i] : Min[Tid] ;
+    MinTot = Key[i] < MinTot ? Key[i] : MinTot ;
   }
   
-  for(i=0;i<NTHREADS;i++) 
-    MinTot = Min[i] < MinTot ? Min[i] : MinTot;
-
-  #pragma omp parallel for num_threads(NTHREADS) schedule(static) \
-  default(none) shared(Key,MinTot,cp)
   for(i=0;i<cp.npart;i++) 
     Key[i] -= MinTot;
  
-  free(Min);
-  
   peano_hilbert_order(Key);
 
   free(Key);
@@ -67,8 +53,6 @@ void peano_hilbert_order(peanokey *Key)
   mp = (struct peano_hilbert_data *) malloc(sizeof(struct peano_hilbert_data) * cp.npart);
   Id = (int *) malloc(sizeof(int) * cp.npart);
 
-  #pragma omp parallel for num_threads(NTHREADS) default(none) \
-  shared(Key,mp,cp)
   for(i=0;i<cp.npart;i++)
   {
     mp[i].index = i;
@@ -77,8 +61,6 @@ void peano_hilbert_order(peanokey *Key)
 
   qsort(mp, cp.npart, sizeof(struct peano_hilbert_data), compare_key);
 
-  #pragma omp parallel for num_threads(NTHREADS) default(none) \
-  shared(Id,mp,cp)
   for(i=0;i<cp.npart;i++)
     Id[mp[i].index] = i;
 

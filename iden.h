@@ -3,22 +3,22 @@
 
 struct iden_st
 {
-	double       r0;        /*Linking Length para el FoF*/
-	unsigned int nobj;
-	int          iper;
-  unsigned int ngrupos;
+	double r0;        /*Linking Length para el FoF*/
+	int    nobj;
+	int    step;
+  int    ngrupos;
 } iden;
 
-struct listvec
-{
-  int indx;
-  struct listvec * next;
-};
-
-typedef struct listvec item;
-
-void busv(item **curr, unsigned int *nvec, int *test);
-//void busv(int *ic, unsigned int *nvec, bool *test, int *ll);
 void identification(void);
+int Raiz(int i);
+void linkedlist(int *grup_thread);
+#ifdef LOCK
+void Unir(int u, int v, omp_lock_t *lock);
+void busv_rec(int i, int *test, omp_lock_t *lock);
+#else
+void Unir(int u, int v);
+void busv_rec(int i, int *test);
+#endif
+
 
 #endif
