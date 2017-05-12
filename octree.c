@@ -297,11 +297,13 @@ void force_setupnonrecursive(struct NODE *no)
   int i;
   struct NODE *nn;
   
-  if(last) last->next = no;
+  if(last)
+    last->next = no;
 
   last = no;
   
-  for(i = 0; i < 8; i++){
+  for(i = 0; i < 8; i++)
+  {
     nn = no->suns[i];
     if(nn != NULL)
       force_setupnonrecursive(nn);

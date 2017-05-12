@@ -8,17 +8,17 @@
 
 struct cosmoparam
 {
-  double       omegam			  ;  /* Omega Materia                         */
-  double       omegal			  ;  /* Omega Lambda                          */
-  double       omegak			  ;  /* Omega Curvatura                       */
-	double       hparam       ;  /* Parámetro de Hubble adimensional      */
-	double       lbox         ;  /* Lado del box [Kpc / h]                */
-	double       Mpart        ;  /* Masa de la partícula [10^10 Msol / h] */
-	unsigned int npart        ;  /* Número de partículas                  */
-	double       redshift		  ;  /* Redshift                              */
-	double       aexp     		;  /*                                       */
-	double       Hubble_a     ;  /*                                       */
-	double       soft         ;  /* Softening [kpc / h]                   */
+    double  omegam			;  /* Omega Materia                         */
+    double  omegal			;  /* Omega Lambda                          */
+    double  omegak			;  /* Omega Curvatura                       */
+		double  hparam      ;  /* Parámetro de Hubble adimensional      */
+		double  lbox        ;  /* Lado del box [Kpc / h]                */
+		double  Mpart       ;  /* Masa de la partícula [10^10 Msol / h] */
+		int     npart       ;  /* Número de partículas                  */
+		double  redshift		;  /* Redshift                              */
+		double  aexp     		;  /*                                       */
+		double  Hubble_a    ;  /*                                       */
+		double  soft        ;  /* Softening [kpc / h]                   */
 } cp;
 
 #endif

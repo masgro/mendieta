@@ -41,7 +41,7 @@ void read_idenfof(char *file){
 
   fread(&_ng,sizeof(int),1,pfin);
   fread(&_npg,sizeof(int),1,pfin);
-  while(1){
+  do{
     fread(&n,sizeof(int),1,pfin);
     if(feof(pfin))break;
     count++;
@@ -62,9 +62,9 @@ void read_idenfof(char *file){
     n_grupos_fof++;
 
     /*Selecciona Grupo FoF mas masivo*/
-    if(n > nmax){nmax = n; imax = n_grupos_fof;}
+    if( n > nmax ){ nmax = n; imax = n_grupos_fof;}
 
-    for(i = 0; i < n; i++){
+    for( i = 0 ; i < n ; i++ ){
       fread(&idt,sizeof(int),1,pfin);
 
       P[idt].fof = n_grupos_fof;
@@ -73,7 +73,7 @@ void read_idenfof(char *file){
     }
     fread(&nt,sizeof(int),1,pfin);
     assert(n == nt);
-  }
+  }while(1);
 
   fclose(pfin);
 
@@ -160,8 +160,7 @@ void read_idenfof(char *file){
 void write_idenfof(char *fof_file){
   char filename[200];
   FILE *pffof;
-  unsigned int i;
-  int l;
+  int i, l;
   unsigned int nobj, ng;
 #ifdef SUBBOXES
   double xcm,ycm,zcm;
@@ -269,8 +268,7 @@ void write_idensub(char *sub_file){
   char filename[200];
   FILE *pfsub, *pffof, *pfascii;
   unsigned int nobj, ng;
-  unsigned int i;
-  int    j, l, count = 0;
+  int    i, j, l, count = 0;
   size_t it;
 
 	gsl_permutation *index;

@@ -49,7 +49,8 @@ void identification(void)
   fprintf(stdout,"Comienza identificacion.....\n");
 
   printf("\nRunning on %d threads\n",NTHREADS);
-  //nthreads = iden.step == 0 ? (1024<<NTHREADS) : (1024<<NTHREADS)/(2<<iden.step); printf("chunks %d for threads\n",nthreads);
+  nthreads = iden.step == 0 ? (1024<<NTHREADS) : (1024<<NTHREADS)/(2<<iden.step);
+  printf("chunks %d for threads\n",nthreads);
 
   #ifdef LOCK
     #pragma omp parallel default(none) private(tid,i) \
@@ -60,7 +61,7 @@ void identification(void)
   #endif
   {
     tid = omp_get_thread_num(); 
-    nthreads = omp_get_num_threads();
+    //nthreads = omp_get_num_threads();
     
     for(i = tid*floor((float)cp.npart/NTHREADS);
     i<(tid==NTHREADS-1 ? cp.npart : (tid+1)*floor((float)cp.npart/NTHREADS));
@@ -78,8 +79,8 @@ void identification(void)
     
     //#pragma omp for schedule(dynamic)
     //#pragma omp for schedule(static)
-    //#pragma omp for schedule(guided)
-    //for(tid=0;tid<nthreads;tid++)
+    #pragma omp for schedule(guided)
+    for(tid=0;tid<nthreads;tid++)
       for(i = tid*floor((float)cp.npart/nthreads);
       i<(tid==nthreads-1 ? cp.npart : (tid+1)*floor((float)cp.npart/nthreads));
       i++)

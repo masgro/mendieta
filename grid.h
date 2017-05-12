@@ -7,6 +7,7 @@
 
 struct gridst
 {
+  int step;
 	unsigned long ngrid;
 	unsigned long nobj;
 	int *llirst;

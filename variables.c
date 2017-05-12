@@ -1,6 +1,5 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <assert.h>
 #include "variables.h"
 #include "cosmoparam.h"
 #include "leesnap.h"
@@ -9,7 +8,6 @@
 void init_variables(int argc, char **argv){
   FILE *pfin;
   char filename[200];
-  int ierr;
 
   RED("Initializing variables...\n");
 
@@ -19,38 +17,15 @@ void init_variables(int argc, char **argv){
   size_int  = sizeof(type_int);
   fprintf(stdout,"type_int:  %zu\n",size_int);
 
-  #ifdef SUBBOXES
-  YELLOW("SUBBOXES ACTIVED\n");
-  assert(argc >= 6);
-  box.cen[0] = (type_real) atof(argv[2]);
-  box.cen[1] = (type_real) atof(argv[3]);
-  box.cen[2] = (type_real) atof(argv[4]);
-  box.lado   = (type_real) atof(argv[5]);
-  box.franja = 1000.0;
-  box.min[0] = box.franja;
-  box.max[0] = box.franja + 2.0*box.lado;
-  box.min[1] = box.franja;
-  box.max[1] = box.franja + 2.0*box.lado;
-  box.min[2] = box.franja;
-  box.max[2] = box.franja + 2.0*box.lado;
-  #endif
-
   sprintf(filename,"%s",argv[1]);
   pfin = fopen(filename,"r");
-  ierr = fscanf(pfin,"%d  \n",&snap.nfiles);
-  assert(ierr == 1);
-  ierr = fscanf(pfin,"%s  \n",snap.root);
-  assert(ierr == 1);
-  ierr = fscanf(pfin,"%s  \n",snap.name);
-  assert(ierr == 1);
-  ierr = fscanf(pfin,"%s  \n",fof_file);
-  assert(ierr == 1);
-  ierr = fscanf(pfin,"%s  \n",sub_file);
-  assert(ierr == 1);
-  ierr = fscanf(pfin,"%lf \n",&cp.soft);
-  assert(ierr == 1);
-  ierr = fscanf(pfin,"%d  \n",&nfrac);
-  assert(ierr == 1);
+  fscanf(pfin,"%d  \n",&snap.nfiles);
+  fscanf(pfin,"%s  \n",snap.root);
+  fscanf(pfin,"%s  \n",snap.name);
+  fscanf(pfin,"%s  \n",fof_file);
+  fscanf(pfin,"%s  \n",sub_file);
+  fscanf(pfin,"%lf \n",&cp.soft);
+  fscanf(pfin,"%d  \n",&nfrac);
   fclose(pfin);
   
   BLUE("********** Information ***********\n");
@@ -61,61 +36,61 @@ void init_variables(int argc, char **argv){
   sprintf(message,"Out file sub groups:     %s\n",sub_file);BLUE(message);
   sprintf(message,"Softening of simulation: %lf \n",cp.soft);BLUE(message);
   sprintf(message,"Identification steps:    %d\n",nfrac);BLUE(message);
-  BLUE("**********************************\n");
-  RED("******** Makefile Options ********\n");
+  BLUE("********** Makefile Options ***********\n");
   #ifdef DEBUG
-  RED("  DEBUG\n");
+  BLUE("  DEBUG\n");
   #endif
   #ifdef COMPUTE_EP
-  RED("  COMPUTE_EP\n");
+  BLUE("  COMPUTE_EP\n");
   #endif
   #ifdef GETPOSITIONS
-  RED("  GETPOSITIONS\n");
+  BLUE("  GETPOSITIONS\n");
   #endif
   #ifdef SUBBOXES
-  RED("  SUBBOXES\n");
+  BLUE("  SUBBOXES\n");
   #endif
   #ifdef PERIODIC
-  RED("  PERIODIC\n");
+  BLUE("  PERIODIC\n");
   #endif
   #ifdef PRECDOUBLE
-  RED("  PRECDOUBLE\n");
+  BLUE("  PRECDOUBLE\n");
   #endif
   #ifdef LONGIDS
-  RED("  LONGIDS\n");
+  BLUE("  LONGIDS\n");
   #endif
   #ifdef POSFACTOR
-  sprintf(message,"  POSFACTOR = %f\n",POSFACTOR);RED(message);
+  sprintf(message,"  POSFACTOR = %f\n",POSFACTOR);BLUE(message);
   #endif
   #ifdef VELFACTOR
-  sprintf(message,"  VELFACTOR = %f\n",VELFACTOR);RED(message);
+  sprintf(message,"  VELFACTOR = %f\n",VELFACTOR);BLUE(message);
   #endif
   #ifdef STORE_VELOCITIES
-  RED("  STORE_VELOCITIES\n");
+  BLUE("  STORE_VELOCITIES\n");
   #endif
   #ifdef ENERGIES
-  RED("  ENERGIES\n");
+  BLUE("  ENERGIES\n");
   #endif
   #ifdef READIDENFOF
-  RED("  READIDENFOF\n");
+  BLUE("  READIDENFOF\n");
   #endif
   #ifdef NHALO
-  sprintf(message,"  NHALO = %d\n",NHALO);RED(message);
+  sprintf(message,"  NHALO = %d\n",NHALO);BLUE(message);
   #endif
   #ifdef limpiamelo
-  RED("  limpiamelo\n");
+  BLUE("  limpiamelo\n");
   #endif
   #ifdef COMPUTE_FOF_PROPERTIES
-  RED("  COMPUTE_FOF_PROPERTIES\n");
+  BLUE("  COMPUTE_FOF_PROPERTIES\n");
   #endif
   #ifdef IDENSUB
-  RED("  IDENSUB\n");
+  BLUE("  IDENSUB\n");
   #endif
   #ifdef ASSIGN_CLOSEST_GROUP
-  RED("  ASSIGN_CLOSEST_GROUP\n");
+  BLUE("  ASSIGN_CLOSEST_GROUP\n");
   #endif
   #ifdef PROP
-  RED("  PROP\n");
+  BLUE("  PROP\n");
   #endif
-  RED("**********************************\n");
+
+  GREEN("END\n");
 }

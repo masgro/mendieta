@@ -35,24 +35,24 @@ size_t size_int;
 
 /* Posiciones, velocidades y energias de las partículas */
 struct particle_data {
-  type_real    Pos[3];
+  type_real      Pos[3];
   #ifdef STORE_VELOCITIES
-  type_real    Vel[3];
+  type_real      Vel[3];
   #endif
   #ifdef STORE_IDS
-  type_int     id;
+  type_int       id;
   #endif
-  type_int     indx;
-  int          gr;
-  unsigned int fof;
-  int          llfof;
+  type_int       indx;
+  unsigned int   fof;
+  int            llfof;
   #ifdef IDENSUB
-  unsigned int sub;
-  int          llsub;
+  unsigned int      sub;
+  int               llsub;
   #endif
   #ifdef ENERGIES
-  double       Ep, Ec;
+  double          Ep, Ec;
   #endif
+  int               gr;
 } *P;
 
 struct grupos{

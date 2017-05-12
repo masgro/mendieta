@@ -8,7 +8,8 @@ void re_change_positions(int n, struct particle_data *Q);
 void read_gadget();
 void select_particles(void);
 
-type_real pmin[3], pmax[3];
+
+static type_real pmin[3], pmax[3];
 
 /*Input and output files*/
 struct SnapST{

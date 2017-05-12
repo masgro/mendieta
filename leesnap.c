@@ -45,7 +45,6 @@ void read_gadget(void){
 void leeheader(char *filename){
   FILE *pf;
   int d1,d2;
-  size_t ierr;
 
   pf = fopen(filename,"r");
   if(pf == NULL){
@@ -53,12 +52,9 @@ void leeheader(char *filename){
     exit(EXIT_FAILURE);
   }
 
-  ierr = fread(&d1, sizeof(d1), 1, pf);
-  assert(ierr == 1);
-  ierr = fread(&header, sizeof(header), 1, pf);
-  assert(ierr == 1);
-  ierr = fread(&d2, sizeof(d2), 1, pf);
-  assert(ierr == 1);
+  fread(&d1, sizeof(d1), 1, pf);
+  fread(&header, sizeof(header), 1, pf);
+  fread(&d2, sizeof(d2), 1, pf);
   assert(d1==d2);
   fclose(pf);
 
@@ -99,12 +95,9 @@ void lee(char *filename, struct particle_data *Q, int *ind){
   FILE *pf;
   int d1, d2;
   int k, pc, n;
-  size_t ierr;
 
   type_real r[3],v[3];
-  #ifdef STORE_IDS
   type_int id;
-  #endif
  
   for(k = 0; k < 3; k++){
     pmin[k] = 1.E26; 
@@ -119,20 +112,15 @@ void lee(char *filename, struct particle_data *Q, int *ind){
 
   fprintf(stdout,"Reading file: %s \n",filename); fflush(stdout);
 
-  ierr = fread(&d1, sizeof(d1), 1, pf);
-  assert(ierr == 1);
-  ierr = fread(&header, sizeof(header), 1, pf);
-  assert(ierr == 1);
-  ierr = fread(&d2, sizeof(d2), 1, pf);
-  assert(ierr == 1);
+  fread(&d1, sizeof(d1), 1, pf);
+  fread(&header, sizeof(header), 1, pf);
+  fread(&d2, sizeof(d2), 1, pf);
   assert(d1==d2);
 
-  ierr = fread(&d1, sizeof(d1), 1, pf);
-  assert(ierr == 1);
+  fread(&d1, sizeof(d1), 1, pf);
   for(k = 0, pc = 0; k < 6; k++){
     for(n = 0; n < header.npart[k]; n++){
-      ierr = fread(&r[0], size_real, 3, pf);
-      assert(ierr == 3);
+      fread(&r[0], size_real, 3, pf);
       if(k == 1){ /*ONLY KEEP DARK MATTER PARTICLES*/
         Q[*ind+pc].Pos[0] = r[0]*POSFACTOR;
         Q[*ind+pc].Pos[1] = r[1]*POSFACTOR;
@@ -149,17 +137,14 @@ void lee(char *filename, struct particle_data *Q, int *ind){
       }
     }
   }
-  ierr = fread(&d2, sizeof(d2), 1, pf);
-  assert(ierr == 1);
+  fread(&d2, sizeof(d2), 1, pf);
   assert(d1==d2);
 
-  ierr = fread(&d1, sizeof(d1), 1, pf);
-  assert(ierr == 1);
+  fread(&d1, sizeof(d1), 1, pf);
 #ifdef STORE_VELOCITIES
   for(k = 0, pc = 0; k < 6; k++){
     for(n = 0; n < header.npart[k]; n++){
-      ierr = fread(&v[0], size_real, 3, pf);
-      assert(ierr == 3);
+      fread(&v[0], size_real, 3, pf);
       if(k == 1){ /*ONLY KEEP DARK MATTER PARTICLES*/
         Q[*ind+pc].Vel[0] = v[0]*VELFACTOR;
         Q[*ind+pc].Vel[1] = v[1]*VELFACTOR;
@@ -171,17 +156,14 @@ void lee(char *filename, struct particle_data *Q, int *ind){
 #else
   fseek(pf,d1,SEEK_CUR);
 #endif
-  ierr = fread(&d2, sizeof(d2), 1, pf);
-  assert(ierr == 1);
+  fread(&d2, sizeof(d2), 1, pf);
   assert(d1==d2);
 
-  ierr = fread(&d1, sizeof(d1), 1, pf);
-  assert(ierr == 1);
+  fread(&d1, sizeof(d1), 1, pf);
 #ifdef STORE_IDS
   for(k = 0, pc = 0; k < 6; k++){
     for(n = 0; n < header.npart[k]; n++){
-      ierr = fread(&id, size_int, 1, pf);
-      assert(ierr == 1);
+      fread(&id, size_int, 1, pf);
       if(k == 1){ /*ONLY KEEP DARK MATTER PARTICLES*/
         Q[*ind+pc].id = id;
         pc++;
@@ -191,8 +173,7 @@ void lee(char *filename, struct particle_data *Q, int *ind){
 #else
   fseek(pf,d1,SEEK_CUR);
 #endif
-  ierr = fread(&d2, sizeof(d2), 1, pf);
-  assert(ierr == 1);
+  fread(&d2, sizeof(d2), 1, pf);
   assert(d1==d2);
 
   *ind += pc;
@@ -244,7 +225,7 @@ void re_change_positions(int n, struct particle_data *Q){
 }
 
 void select_particles(void){
-  unsigned int i,j;
+  int i,j;
 
   fprintf(stdout,"Selecting particles within a subbox\n"); fflush(stdout);
   

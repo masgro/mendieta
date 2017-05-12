@@ -7,18 +7,6 @@
 #include "grid.h"
 #include "cosmoparam.h"
 
-/*
-i = grid.llirst[igrid];
-while(i != -1)
-{
-  //hace lo que quieras
-
-  i = grid.ll[i];
-}
-*/
-
-
-
 void grid_init(void)
 {
   int i;
@@ -29,15 +17,13 @@ void grid_init(void)
 	grid.llirst	= (int *) malloc(nalloc*sizeof(int));
   assert(grid.llirst != NULL);
   memset(grid.llirst,-1,nalloc*sizeof(int));
-
-  //for(i = 0; i < nalloc; i++) grid.llirst[i] = -1;
-
 	grid.ll = (int *) malloc(grid.nobj*sizeof(int));
   assert(grid.ll != NULL);
 }
 
-void grid_build(void){
-  unsigned int i;
+void grid_build(void)
+{
+  int i;
   unsigned long ix, iy, iz;
   double fac;
 	unsigned long ibox;
@@ -45,7 +31,12 @@ void grid_build(void){
   fac = (double)grid.ngrid/(double)cp.lbox ;
 	printf("Building Grid..... Ngrid = %lu\n",grid.ngrid);
 
-  for( i = 0 ; i < grid.nobj ; i++ ){
+  //for( i = 0 ; i < grid.nobj ; i++ )
+  for( i = 0 ; i < cp.npart ; i++ )
+  {
+
+    if(grid.step!=0 && P[i].sub==0) continue;
+
     ix = (unsigned long)((double)P[i].Pos[0]*fac);
     iy = (unsigned long)((double)P[i].Pos[1]*fac);
     iz = (unsigned long)((double)P[i].Pos[2]*fac);

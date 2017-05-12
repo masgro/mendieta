@@ -10,26 +10,25 @@
 #include "limpieza.h"
 #include "timer.h"
 #include "octree.h"
-#include "bitmask.h"
 
 #define EMIN 0.0
 
 int n_free_particles;
 
 #ifdef IDENSUB
-void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
-  unsigned int i, k, grupo;
+void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo)
+{
+  int          i, k, l, grupo;
   unsigned int contador;
-  int l;
   struct elemento *curr;
-  int *test;
+  bool *test;
 
-  #ifdef DEBUG
+#ifdef DEBUG
   int j, l1, l2, l3;
-  #endif
+#endif
 
   fprintf(stdout,"Clean up begins.... n_grupos_sub %d\n",n_grupos_sub);
-  test = (int *) calloc(ngrupos/32 + 1,sizeof(int));
+  test = (bool *) calloc(ngrupos,sizeof(bool));
 
   for(i = 0; i < cp.npart; i++)
     P[i].sub = 0;
@@ -37,7 +36,8 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
   contador = 0; 
   /*Recorre cada uno de los grupos identificados en el paso ifrac-1
     limpiando por energia cada uno de sus subgrupos*/
-  for(k = 1; k < n_grupos_sub; k++){
+  for(k = 1; k < n_grupos_sub; k++)
+  {
     if(sub[k].np == 0 || sub[k].llirst == -1) continue;
 
     /*Para cada grupos identificado en el paso ifrac-1 crea una linked list
@@ -50,31 +50,31 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
     Temp.nsub = 0;           //Contador de subgrupos
     Temp.massive_one = 0;    //Subgrupo mas masivo
     Temp.np_massive_one = 0; //Cantidad de particulas en subgrupo mas masivo
-
-    #ifdef DEBUG
+#ifdef DEBUG
     j= 0; l1 = 0;
-    #endif
+#endif
     l = sub[k].llirst; 
-    while(l != -1){
-
-      #ifdef DEBUG
+    while(l != -1)
+    {
+#ifdef DEBUG
       assert(P[l].sub == 0);
-      #endif
+#endif
 
       grupo = P[l].gr;
-      if(grupo == 0) { //Checkea si la particula es una particula libre 
+      if(grupo == 0) //Checkea si la particula es una particula libre 
+      {
         n_free_particles++;
         curr = (struct elemento *) malloc(sizeof(struct elemento));
         curr->id = l;
         curr->next = head_free_particles;
         head_free_particles = curr;
       }
-      else if(!TestBit(test,grupo)) //Checkear que este subgrupo no este en la lista
+      else if(test[grupo] == 0) //Checkear que este subgrupo no este en la lista
       {
-        #ifdef DEBUG
+#ifdef DEBUG
         assert(Temp.npgrup[grupo] >= NPARTMIN);
-        #endif
-        SetBit(test,grupo);
+#endif
+        test[grupo] = 1; 
 
         //Agrega este subgrupo a la lista de subgrupos
         curr = (struct elemento *) malloc(sizeof(struct elemento));
@@ -84,7 +84,7 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
 
         Temp.nsub++; //Contador de subgrupos
 
-        #ifdef DEBUG
+#ifdef DEBUG
         l3 = 0;
         l2 = Temp.head[grupo];
         while(l2 != -1)
@@ -94,30 +94,30 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
           l3++;
         }
         assert(l3 == Temp.npgrup[grupo]);
-        #endif
-
+#endif
         //Checkea si es el grupo mas masivo
-        if(Temp.npgrup[grupo] > Temp.np_massive_one) {
+        if(Temp.npgrup[grupo] > Temp.np_massive_one)
+        {
           Temp.np_massive_one = Temp.npgrup[grupo];
           Temp.massive_one = grupo;
         }
       }
 
-      #ifdef DEBUG
+#ifdef DEBUG
       j++;
-      #endif
-
+#endif
       l = P[l].llsub;
     }
 
-    #ifdef DEBUG
+#ifdef DEBUG
     assert(j == sub[k].np);
     assert(Temp.massive_one != 0 || Temp.nsub == 0);
     assert((l1+n_free_particles) == j);
-    #endif
+#endif
 
     /*** Una sola subestructura ***/
-    if(Temp.nsub <= 1){
+    if(Temp.nsub <= 1)
+    {
       contador++;
       only_one_substructure(k,contador);
       free_memory();
@@ -125,7 +125,7 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
     }
     /******************************/
 
-    #ifdef ASSIGN_CLOSEST_GROUP
+#ifdef ASSIGN_CLOSEST_GROUP
     /* Calcula velocidades y posicion de los subhalos con mas de NPARTMIN part */
     Temp.vcm    = (type_real **) malloc(3*sizeof(type_real*));
     Temp.vcm[0] = (type_real *)  malloc(ngrupos*sizeof(type_real));
@@ -137,26 +137,24 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
     Temp.pcm[2] = (type_real *)  malloc(ngrupos*sizeof(type_real));
 
     compute_velocity_position();
-    #endif
+#endif
 
-    #ifdef REASIGNA
-    #ifdef ASSIGN_CLOSEST_GROUP
+#ifdef ASSIGN_CLOSEST_GROUP
     reasigna_closest();
-    #else
+#else
     /* Reasigna particulas sin grupo */
     reasigna();
-    #endif
-    #endif
+#endif
 
-    #ifdef DEBUG
-    assert(Temp.npgrup[Temp.massive_one] == Temp.np_massive_one + n_free_particles);
-    #endif
-
+#ifdef DEBUG
+    //assert(Temp.npgrup[Temp.massive_one] == Temp.np_massive_one + n_free_particles);
+#endif
     Temp.np_massive_one = Temp.npgrup[Temp.massive_one];
 
     /* Limpia subgrupos excepto el mas masivo */
     curr = head_subgroups;
-    while(curr != NULL){
+    while(curr != NULL)
+    {
       i = curr->id;
 
       if(i != Temp.massive_one)
@@ -167,7 +165,8 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
     /*Termino de limpiar los subgrupos excepto el mas masivo*/
 
     /*** Despues de la limpieza queda solo una subestructura ***/
-    if(Temp.nsub <= 1){
+    if(Temp.nsub <= 1)
+    {
       contador++;
       only_one_substructure(k,contador);
       free_memory();
@@ -178,9 +177,11 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
     limpieza_new(Temp.massive_one,0);
 
     curr = head_subgroups;
-    while(curr){
+    while(curr)
+    {
       i = curr->id;
-      if(Temp.head[i] == -1){
+      if(Temp.head[i] == -1)
+      {
         assert(Temp.npgrup[i] == 0);
         curr = curr->next;
         continue;
@@ -192,7 +193,8 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
       j = 0;
       #endif
       l = Temp.head[i];
-      while(l != -1){
+      while(l != -1)
+      {
         P[l].sub = contador;
         l = Temp.ll[l];
         #ifdef DEBUG
@@ -211,41 +213,46 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
 
   *contador_subgrupo = contador;
 
-  #ifdef ASSIGN_CLOSEST_GROUP
+#ifdef ASSIGN_CLOSEST_GROUP
   free(Temp.pcm[0]); free(Temp.pcm[1]); free(Temp.pcm[2]); free(Temp.pcm);
   free(Temp.vcm[0]); free(Temp.vcm[1]); free(Temp.vcm[2]); free(Temp.vcm);
-  #endif
-
+#endif
   free(test);
   printf("End cleaning. Subgroups found = %u \n",contador);
 }
 #endif
 
 #ifdef ASSIGN_CLOSEST_GROUP
-void compute_velocity_position(){
+void compute_velocity_position()
+{
   int ig,ip,idim;
 
   struct elemento *curr;
  
   curr = head_subgroups;
-  while(curr != NULL){
+  while(curr != NULL)
+  {
     ig = curr->id;
 
-    for(idim = 0; idim < 3; idim++){
+    for(idim = 0; idim < 3; idim++)
+    {
       Temp.vcm[idim][ig] = 0.0;
       Temp.pcm[idim][ig] = 0.0;
     }
 
     ip = Temp.head[ig];
-    while(ip != -1){
-      for(idim = 0; idim < 3; idim++){
+    while(ip != -1)
+    {
+      for(idim = 0; idim < 3; idim++)
+      {
         Temp.vcm[idim][ig] += P[ip].Vel[idim];
         Temp.pcm[idim][ig] += P[ip].Pos[idim];
       }
       ip = Temp.ll[ip];
     }
 
-    for(idim = 0; idim < 3; idim++){
+    for(idim = 0; idim < 3; idim++)
+    {
       Temp.vcm[idim][ig] /= (type_real)Temp.npgrup[ig];
       Temp.pcm[idim][ig] /= (type_real)Temp.npgrup[ig];
     }
@@ -256,18 +263,21 @@ void compute_velocity_position(){
 #endif
 
 #ifdef IDENSUB
-void free_memory(void){
+void free_memory(void)
+{
   struct elemento *curr, *puntero;
 
   curr = head_free_particles;
-  while(curr){
+  while(curr)
+  {
     puntero = curr->next;
     free(curr);
     curr = puntero;
   }
 
   curr = head_subgroups;
-  while(curr){
+  while(curr)
+  {
     puntero = curr->next;
     free(curr);
     curr = puntero;
@@ -276,26 +286,30 @@ void free_memory(void){
 #endif
 
 #ifdef ASSIGN_CLOSEST_GROUP
-void reasigna_closest(void){
+void reasigna_closest(void)
+{
   int ig,ip,idim;
   int destino;
   struct elemento *curr, *curr_gr;
   type_real dp[3], dv[3], dis, E, Ep, Ec;
 
   curr = head_free_particles;
-  while(curr != NULL){
+  while(curr != NULL)
+  {
     ip = curr->id;
 
     E = 1.E26;
     destino = Temp.massive_one;
   
     curr_gr = head_subgroups;
-    while(curr_gr != NULL){
+    while(curr_gr != NULL)
+    {
       ig = curr_gr->id;
 
       dis = 0.0;
       Ec = 0.0;
-      for(idim = 0 ; idim < 3; idim++){
+      for(idim = 0 ; idim < 3; idim++)
+      {
         dp[idim] = Temp.pcm[idim][ig] - P[ip].Pos[idim];
         dis += dp[idim]*dp[idim];
 
@@ -323,7 +337,8 @@ void reasigna_closest(void){
       //  destino = ig;
       //}
 
-      if(Ep < E){
+      if(Ep < E)
+      {
         E = Ep;
         destino = ig;
       }
@@ -331,10 +346,10 @@ void reasigna_closest(void){
       curr_gr = curr_gr->next;
     }
 
-    #ifdef DEBUG
+#ifdef DEBUG
     assert(destino != 0);
     assert(P[ip].gr == 0);
-    #endif
+#endif
   
     P[ip].gr = destino;
     Temp.ll[ip] = Temp.head[destino];
@@ -348,7 +363,8 @@ void reasigna_closest(void){
 
 #ifndef  ASSIGN_CLOSEST_GROUP
 /*reasigna particulas libres al grupo mas masivo*/
-void reasigna(void){
+void reasigna(void)
+{
   int k;
   int destino;
   struct elemento *curr;
@@ -356,7 +372,8 @@ void reasigna(void){
   destino = Temp.massive_one;
 
   curr = head_free_particles;
-  while(curr != NULL){
+  while(curr != NULL)
+  {
     k = curr->id;
 
     P[k].gr = destino;
@@ -372,6 +389,7 @@ void reasigna(void){
 void limpieza_new(int ig, int destino){
   int    i,j,k,n_unbound,temp,iEpmin;
   int    dim;
+  int    indx;
   int    *lista;
   double pcm[3],vcm[3];
   double dv[3];
@@ -567,7 +585,7 @@ void limpieza_new(int ig, int destino){
 }
 
 void compute_potential_energy_subgrupo(int npart, struct particle_data *Q, int *iEpmin){
-  int    i,j,dim,iEpmin_local = -1;
+  int    i,j,dim,iEpmin_local;
   float  Theta = 0.45;
   double dx[3],dis,Epmin;
 
