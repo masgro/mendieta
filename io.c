@@ -240,7 +240,7 @@ void write_idenfof(char *fof_file){
     #endif
     l = fof[ng].llirst;
     while(l != -1){
-      fwrite(&l,sizeof(int),1,pffof);
+      fwrite(&P[l].id,sizeof(int),1,pffof);
 
       //reasgina grupos fof a la particula l para que los grupos
       //este ordenados de mayor a menor
@@ -373,7 +373,7 @@ void write_idensub(char *sub_file){
         #ifdef READIDENFOF
         fwrite(&P[l].indx,sizeof(int),1,pfsub);
         #else
-        fwrite(&l,sizeof(int),1,pfsub);
+        fwrite(&P[l].id,sizeof(int),1,pfsub);
         #endif
         l = P[l].llsub;
         #ifdef DEBUG
