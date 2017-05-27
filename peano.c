@@ -10,64 +10,35 @@
 void peano_hilbert()
 {
   int i;
-  type_real DomainFac = 1.0 / (cp.lbox*1.001) * (((peanokey) 1) << (BITS_PER_DIMENSION));
-  peanokey MinTot;
-
-  peanokey *Key;            /*!< a table used for storing Peano-Hilbert keys for particles */
-
-  Key = (peanokey *) malloc(sizeof(peanokey)*cp.npart);
-  
-  MinTot = (((peanokey)1)<<(3*BITS_PER_DIMENSION));
-
-  for(i=0;i<cp.npart;i++) 
-  {
-    Key[i] = peano_hilbert_key(P[i].Pos[0]*DomainFac,P[i].Pos[1]*DomainFac,P[i].Pos[2]*DomainFac,BITS_PER_DIMENSION);  
-    MinTot = Key[i] < MinTot ? Key[i] : MinTot ;
-  }
-  
-  for(i=0;i<cp.npart;i++) 
-    Key[i] -= MinTot;
- 
-  peano_hilbert_order(Key);
-
-  free(Key);
-
-  return;
-}
-
-
-
-/*! This function puts the particles into Peano-Hilbert order by sorting them
- *  according to their keys. The latter half already been computed in the
- *  domain decomposition. Since gas particles need to stay at the beginning of
- *  the particle list, they are sorted as a separate block.
- */
-void peano_hilbert_order(peanokey *Key)
-{
-  int i;
-  int *Id;
   struct peano_hilbert_data *mp;
+  peanokey MinTot = (((peanokey)1)<<(3*BITS_PER_DIMENSION));
+  type_real DomainFac = 1.0 / (cp.lbox*1.001) * (((peanokey) 1) << (BITS_PER_DIMENSION));
 
   printf("Comienza Peano-Hilbert...\n");
 
   mp = (struct peano_hilbert_data *) malloc(sizeof(struct peano_hilbert_data) * cp.npart);
   Id = (int *) malloc(sizeof(int) * cp.npart);
 
-  for(i=0;i<cp.npart;i++)
+  for(i=0;i<cp.npart;i++) 
   {
     mp[i].index = i;
-    mp[i].key = Key[i];
+    mp[i].key = peano_hilbert_key(P[i].Pos[0]*DomainFac,P[i].Pos[1]*DomainFac,P[i].Pos[2]*DomainFac,BITS_PER_DIMENSION);  
+    MinTot = mp[i].key < MinTot ? mp[i].key : MinTot ;
   }
+ 
+  for(i=0;i<cp.npart;i++) 
+    mp[i].key -= MinTot;
 
   qsort(mp, cp.npart, sizeof(struct peano_hilbert_data), compare_key);
 
   for(i=0;i<cp.npart;i++)
     Id[mp[i].index] = i;
 
+  free(mp);
+
   reorder_particles(Id);
 
   free(Id);
-  free(mp);
 
   return;
 }
