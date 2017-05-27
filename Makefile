@@ -6,12 +6,13 @@
 
 
 ### snapshot options #######
-EXTRAS += -DPERIODIC    #periodic boundary condition
+#EXTRAS += -DPERIODIC    #periodic boundary condition
 #EXTRAS += -DPRECDOUBLE   #Pos and vel in double precision
 #EXTRAS += -DLONGIDS            #IDs are long integer
-EXTRAS += -DPOSFACTOR=1000.0    #Positions in Kpc/h
-EXTRAS += -DVELFACTOR=1.0      #Velocities in km/s
+#EXTRAS += -DPOSFACTOR=1000.0    #Positions in Kpc/h
+#EXTRAS += -DVELFACTOR=1.0      #Velocities in km/s
 EXTRAS += -DSTORE_VELOCITIES
+EXTRAS += -DSTORE_IDS
 EXTRAS += -DENERGIES
 
 ### IDENFOF options #############
@@ -22,7 +23,7 @@ EXTRAS += -Dlimpiamelo  #
 
 ## IDENSUB options ##############
 EXTRAS += -DIDENSUB
-#EXTRAS += -DASSIGN_CLOSEST_GROUP
+EXTRAS += -DASSIGN_CLOSEST_GROUP
 #EXTRAS += -DPROP
 #EXTRAS += -I/usr/local/include/gsl/
 
@@ -31,7 +32,7 @@ EXTRAS += -DIDENSUB
 #DOMPP:=-DompP
 #CC     := $(OMPP) icc $(DOMPP)
 CC     := $(OMPP) gcc $(DOMPP)
-DC     := -DNTHREADS=6
+DC     := -DNTHREADS=8
 CFLAGS := -Wall -O3 -fopenmp -g
 #GSLL   := -L/usr/local/lib/ -lgsl -lgslcblas
 GSLL   := -lgsl -lgslcblas
