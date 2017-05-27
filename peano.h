@@ -12,7 +12,6 @@ struct peano_hilbert_data
 
 void      peano_hilbert(void);
 peanokey  peano_hilbert_key(int x, int y, int z, int bits);
-void      peano_hilbert_order(peanokey *Key);
 int       compare_key(const void *a, const void *b);
 void reorder_particles(int *Id);
 
