@@ -5,7 +5,7 @@
 
 #include "variables.h"
 #include "cosmoparam.h"
-#include "propiedades.h"
+#include "propiedades.old.h"
 #include "octree.h"
 #include "deltas.h"
 
@@ -35,7 +35,7 @@ struct propiedades_st propiedades(struct particle_data *P, int grupo)
 	int    indx,iepmin;
 	int    i200, ivir;
 	float  drt;
-	type_real  dx[3],dv[3];
+	my_real  dx[3],dv[3];
 	float a,lbox2,Epmin;
 	gsl_vector_float *_dis;
 	gsl_permutation  *_ind;
@@ -46,7 +46,7 @@ struct propiedades_st propiedades(struct particle_data *P, int grupo)
   lbox2 = (float)cp.lbox*0.5f;
 	a = (1.0 / (1.0 + cp.redshift));
 
-  Prop.npart = groups[grupo].np;
+  Prop.npart = fof[grupo].np;
 
 	for(dim = 0; dim < 3; dim++)
 	{
@@ -59,11 +59,9 @@ struct propiedades_st propiedades(struct particle_data *P, int grupo)
 	Q	= (struct particle_data *) malloc(Prop.npart*sizeof(struct particle_data));
 
 	i = 0;
-  current = groups[grupo].first;
- 	while(current != NULL)
+  l = fof[grupo].llirst;
+ 	while(l != -1)
  	{
-    l = current->indx;
-
 		Q[i].Pos[0] = P[l].Pos[0];
 		Q[i].Pos[1] = P[l].Pos[1];
 		Q[i].Pos[2] = P[l].Pos[2];
@@ -80,17 +78,16 @@ struct propiedades_st propiedades(struct particle_data *P, int grupo)
 
 	  i++;
 
-    current = current->next;
+    l = P[l].llfof;
  	}
 
-#ifdef DEBUG
+  #ifdef DEBUG
 	assert(i == Prop.npart);
-#endif
+  #endif
 
-	for(dim = 0; dim < 3; dim++)
-	{
-		Prop.pcm[dim] /= (type_real)Prop.npart;
-		Prop.vcm[dim] /= (type_real)Prop.npart;
+	for(dim = 0; dim < 3; dim++){
+		Prop.pcm[dim] /= (my_real)Prop.npart;
+		Prop.vcm[dim] /= (my_real)Prop.npart;
   }
 
 	/* Si el halo tiene menos de 1000 particulas calcula la energia
@@ -112,7 +109,7 @@ struct propiedades_st propiedades(struct particle_data *P, int grupo)
  			Q[i].Ec += dv[2]*dv[2];
  			Q[i].Ec *= 0.5;
 
-#ifndef COMPUTE_EP
+      #ifndef COMPUTE_EP
       /* Calcula energia potencial */
 			Q[i].Ep  = 0.;
 		  for(j = 0; j < Prop.npart; j++)
@@ -134,14 +131,14 @@ struct propiedades_st propiedades(struct particle_data *P, int grupo)
 		  Q[i].Ep += (1./cp.soft);            /* Autoenergia */
 		  Q[i].Ep *= (GCONS*cp.Mpart*Msol*1.E10/Kpc/a);
 			Q[i].Ep *= (-1.);                   /* Cambio de signo para que Ep sea negativa */
-#endif
+      #endif
 		}
 	}
 	else
 	{
 #ifndef COMPUTE_EP
 		force_treeallocate(2 * Prop.npart + 200);
-		force_treebuild(Prop.npart, Theta);
+		force_treebuild(Prop.npart,Q,Theta);
 #endif
 
 		for(i = 0; i < Prop.npart; i++)
@@ -185,9 +182,9 @@ struct propiedades_st propiedades(struct particle_data *P, int grupo)
 		}
 	}
 
-#ifdef DEBUG
+  #ifdef DEBUG
 	assert((0 <= iepmin) && (iepmin<Prop.npart));
-#endif
+  #endif
 
   for(dim = 0; dim < 3; dim++)
     Prop.mostbound[dim] = Q[iepmin].Pos[dim];

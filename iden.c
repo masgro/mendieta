@@ -4,12 +4,15 @@
 #include <math.h>
 #include <stdbool.h>
 #include <omp.h>
+#include <string.h>
 
 #include "variables.h"
 #include "cosmoparam.h"
 #include "grid.h"
 #include "iden.h"
 #include "bitmask.h"
+
+#define MY_DIM 0
 
 struct global_head_st{
   item *head;
@@ -19,15 +22,14 @@ struct global_head_st{
 void identification(void){
   unsigned int nvec;
   int  nthreads, tid;
-  int  i,j,ngrupo;
+  my_int i,j,ngrupo;
   item *tmp,*tmp1;
   item *curr,*head;
   int *test;
-  type_real zmin,zmax,zcm;
-  int nn;
-  int *grupos_per_thread;
+  my_real zcm;
+  my_int nn;
+  my_int *grupos_per_thread,ntotal;
   void *puntero;
-  int ntotal;
   struct global_head_st **global_head;
   struct global_head_st *curr_global_head;
 
@@ -61,30 +63,78 @@ void identification(void){
   iden.ngrupos = 0;
 
   ntotal = 0; ngrupo = 0;
+  my_real *zmin,*zmax;
 #pragma omp parallel default(none) reduction(+:ntotal) \
   private(head,curr,nvec,tmp,tmp1,test,tid,i,zcm,nn,   \
-          curr_global_head,puntero,j,zmin,zmax,nthreads) \
-  shared(P,iden,global_head,cp,grupos_per_thread,ngrupo)                     
+          curr_global_head,puntero,j,nthreads) \
+  shared(P,iden,global_head,cp,grupos_per_thread,ngrupo,zmin,zmax,stdout)                     
 {
   tid = omp_get_thread_num();
 
   nthreads = omp_get_num_threads();
-  zmin = (type_real)tid*cp.lbox/(type_real)nthreads;
-  zmax = (type_real)(tid+1)*cp.lbox/(type_real)nthreads;
+  //zmin = (my_real)tid*cp.lbox/(my_real)nthreads;
+  //zmax = (my_real)(tid+1)*cp.lbox/(my_real)nthreads;
 
   if(tid == 0){
-    printf("\nRunning on %d threads\n",nthreads);
-    grupos_per_thread = (int *) malloc(nthreads*sizeof(int));
-    global_head = (struct global_head_st **) malloc(nthreads*sizeof(struct global_head_st *));
-  }
-  #pragma omp barrier
+    my_int nhist = 160;
+    my_int *zhist;
+    my_real *zhist_lim;
+    zhist = (my_int *) calloc(nhist,sizeof(my_int));
+    zhist_lim = (my_real *) malloc(nhist*sizeof(my_real));
+    zmin = (my_real *) malloc(nthreads*sizeof(my_real));
+    zmax = (my_real *) malloc(nthreads*sizeof(my_real));
 
+    printf("\nRunning on %d threads\n",nthreads);
+    grupos_per_thread = (my_int *) malloc(nthreads*sizeof(my_int));
+    global_head = (struct global_head_st **) malloc(nthreads*sizeof(struct global_head_st *));
+
+//    my_real med,sig;
+//    for(j = 0; j < 3; j++){
+//      memset(zhist,0,nhist*sizeof(my_real));
+//      for(i = 0; i < iden.nobj; i++)
+//        zhist[(my_int)(P[i].Pos[j]/cp.lbox*(my_real)nhist)]++;
+//
+//      med = 0.;
+//      for(i = 0; i < nhist; i++){
+//        med += (my_real)zhist[i];
+//      }
+//      med /= (my_real)nhist;
+//      sig = 0.;
+//      for(i = 0; i < nhist; i++){
+//        sig += (my_real)((zhist[i]-med)*(zhist[i]-med));
+//      }
+//      sig /= (my_real)(nhist - 1);
+//      printf("%d %f %f\n",j,sqrt(sig),med);
+//    }
+
+    for(i = 0; i < iden.nobj; i++)
+      zhist[(my_int)(P[i].Pos[MY_DIM]/cp.lbox*(my_real)nhist)]++;
+
+    for(i = 0; i <= nhist; i++) zhist_lim[i] = (my_real)i*cp.lbox/(my_real)nhist;
+
+    my_int sum;
+    sum = 0;
+    for(j = 0, i = 0; j < nthreads; j++){
+      zmin[j] = zhist_lim[i];
+      while(1){
+        sum += zhist[i];
+        i++;
+        if((sum > (my_int)((my_real)(j+1)*(my_real)iden.nobj/(my_real)nthreads)) || (i >= nhist)){
+          break;
+        }
+      }
+      zmax[j] = zhist_lim[i];
+    }
+  }
+
+  #pragma omp barrier
   test = (int *) calloc(iden.nobj/32 + 1,sizeof(int));
 
   global_head[tid] = NULL;
-  for(i =0; i < iden.nobj; i++){
+  for(i = 0; i < iden.nobj; i++){
     if(TestBit(test,i))continue;
-    if(P[i].Pos[2] < zmin || P[i].Pos[2] >= zmax) continue;
+    //if(P[i].Pos[2] < zmin || P[i].Pos[2] >= zmax) continue;
+    if(P[i].Pos[MY_DIM] < zmin[tid] || P[i].Pos[MY_DIM] >= zmax[tid]) continue;
 
     SetBit(test,i);
 
@@ -107,14 +157,15 @@ void identification(void){
     zcm = 0.0; nn = 0;
     curr = head;
     while(curr){
-      zcm += P[curr->indx].Pos[2]; 
+      zcm += P[curr->indx].Pos[MY_DIM]; 
       nn++;
 
       curr = curr->next;
     }
-    zcm /= (type_real)nn;
+    zcm /= (my_real)nn;
 
-    if(zcm < zmin || zcm >= zmax || nn < NPARTMIN){
+    //if(zcm < zmin || zcm >= zmax || nn < NPARTMIN){
+    if(zcm < zmin[tid] || zcm >= zmax[tid] || nn < NPARTMIN){
       curr = head;
       while(curr){
         puntero = curr->next;
@@ -191,40 +242,36 @@ void identification(void){
 }
 
 void busv(item **curr, unsigned int *nvec, int *test){
-  long ixc, iyc, izc;
   long ixci, iyci, izci;
   long ixcf, iycf, izcf;
   long ix, iy, iz;
   long ixx, iyy, izz;
-  long ibox;
-  type_real xx, yy, zz;
-  type_real dis;
-  int i;
-  type_real lbox,fac;
-  long ngrid;
-  int ic;
+  long ibox,ngrid;
+  my_int i,ic,count;
+  my_real xx, yy, zz;
+  my_real dis;
+  my_real lbox,fac;
   item *tmp, *clone;
-  unsigned int count;
 
   clone = *curr;
   ic = clone->indx;
 
   ngrid = grid.ngrid;
   lbox  = cp.lbox;
-  fac   = (type_real)ngrid/lbox;
+  fac   = (my_real)ngrid/lbox;
   #ifdef PERIODIC
-  type_real lbox2 = lbox/2.0;
+  my_real lbox2 = lbox/2.0;
   #endif
 
-  ixc  = (int)(P[ic].Pos[0]*fac);
-  ixci = ixc - 1;
-  ixcf = ixc + 1;
-  iyc  = (int)(P[ic].Pos[1]*fac);
-  iyci = iyc - 1;
-  iycf = iyc + 1;
-  izc  = (int)(P[ic].Pos[2]*fac);
-  izci = izc - 1;
-  izcf = izc + 1;
+  ixcf = (long)(P[ic].Pos[0]*fac);
+  ixci = ixcf - 1;
+  ixcf = ixcf + 1;
+  iycf = (long)(P[ic].Pos[1]*fac);
+  iyci = iycf - 1;
+  iycf = iycf + 1;
+  izcf = (long)(P[ic].Pos[2]*fac);
+  izci = izcf - 1;
+  izcf = izcf + 1;
 
   #ifndef PERIODIC
   if( ixci < 0 ) ixci = 0;
@@ -259,53 +306,48 @@ void busv(item **curr, unsigned int *nvec, int *test){
         ibox = (ix * ngrid + iy) * ngrid + iz ;
 
         i = grid.llirst[ibox];
-        while(i != -1){
+        do{
           #ifdef IDENSUB
-          if(P[i].sub != P[ic].sub){
-            i = grid.ll[i];
-            continue;
+          if(P[i].sub == P[ic].sub){
+          #endif
+            if(!TestBit(test,i)){
+              xx = P[i].Pos[0] - P[ic].Pos[0];
+              yy = P[i].Pos[1] - P[ic].Pos[1];
+              zz = P[i].Pos[2] - P[ic].Pos[2];
+
+              #ifdef PERIODIC
+              if( xx >  lbox2 ) xx = xx - lbox;
+              if( yy >  lbox2 ) yy = yy - lbox;
+              if( zz >  lbox2 ) zz = zz - lbox;
+              if( xx < -lbox2 ) xx = xx + lbox;
+              if( yy < -lbox2 ) yy = yy + lbox;
+              if( zz < -lbox2 ) zz = zz + lbox;
+              #endif
+
+              dis = xx*xx + yy*yy + zz*zz;
+
+              if(dis < iden.r0){
+                SetBit(test,i);
+
+                tmp = (item *) malloc(sizeof(item));
+                #ifdef DEBUG
+                assert(tmp != NULL);
+                #endif
+
+                tmp->indx = i;
+                tmp->next = NULL;
+
+                clone->next = tmp;
+                clone = tmp;
+
+                count++;
+              }
+            }
+          #ifdef IDENSUB 
           }
           #endif
-          if(TestBit(test,i)){
-            i = grid.ll[i];
-            continue;
-          }
-
-          xx = P[i].Pos[0] - P[ic].Pos[0];
-          yy = P[i].Pos[1] - P[ic].Pos[1];
-          zz = P[i].Pos[2] - P[ic].Pos[2];
-
-          #ifdef PERIODIC
-          if( xx >  lbox2 ) xx = xx - lbox;
-          if( yy >  lbox2 ) yy = yy - lbox;
-          if( zz >  lbox2 ) zz = zz - lbox;
-          if( xx < -lbox2 ) xx = xx + lbox;
-          if( yy < -lbox2 ) yy = yy + lbox;
-          if( zz < -lbox2 ) zz = zz + lbox;
-          #endif
-
-          dis = xx*xx + yy*yy + zz*zz;
-
-          if(dis < iden.r0){
-            SetBit(test,i);
-
-            tmp = (item *) malloc(sizeof(item));
-            #ifdef DEBUG
-            assert(tmp != NULL);
-            #endif
-
-            tmp->indx = i;
-            tmp->next = NULL;
-
-            clone->next = tmp;
-            clone = tmp;
-
-            count++;
-          }
-
           i = grid.ll[i];
-
-        } /*fin lazo particulas del grid*/
+        }while(i != grid.llirst[ibox]); /*fin lazo particulas del grid*/
       } /*fin izz*/
     } /*fin iyy*/
   } /*fin ixx*/

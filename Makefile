@@ -2,6 +2,7 @@
 #EXTRAS += -DDEBUG       # it will check for anomalities
 #EXTRAS += -DCOMPUTE_EP
 #EXTRAS += -DGETPOSITIONS
+#EXTRAS += -DGETINDEX
 #EXTRAS += -DSUBBOXES
 
 
@@ -19,14 +20,14 @@ EXTRAS += -DENERGIES
 #EXTRAS += -DREADIDENFOF
 #EXTRAS += -DNHALO=1     # set to the number of halo to analyse
 #EXTRAS += -Dlimpiamelo  #
-#EXTRAS += -DCOMPUTE_PROPERTIES
+#EXTRAS += -DCOMPUTE_FOF_PROPERTIES
 
 ## IDENSUB options ##############
 EXTRAS += -DIDENSUB
 EXTRAS += -DASSIGN_CLOSEST_GROUP
 
 ## INCLUDES #####################
-INC += -I/usr/local/include/gsl/
+#INC += -I/usr/local/include/gsl/
 
 #Intel CC
 #OMPP:=kinst-ompp-papi
@@ -34,8 +35,9 @@ INC += -I/usr/local/include/gsl/
 CC     := $(OMPP) gcc $(DOMPP)
 DC     := -DNTHREADS=8
 CFLAGS := -Wall -O3 -fopenmp
-GSLL   := -L/usr/local/lib/ -lgsl -lgslcblas -lm
+GSLL   := -lgsl -lgslcblas
 LIBS   := -lm
+LIBS   += $(GSLL)
 
 #CFLAGS += -fdump-tree-vect-blocks=mendieta.dump
 #CFLAGS += -fdump-tree-pre=stderr
@@ -47,7 +49,7 @@ LIBS   := -lm
 MAKEFILE := Makefile
 
 OBJS := octree.o leesnap.o grid.o deltas.o \
-				variables.o io.o iden.o limpieza.o # compute_prop.o
+				variables.o io.o iden.o #limpieza.o #compute_prop.o
 
 HEADERS := $(patsubst %.o,%.h,$(OBJS))
 
@@ -59,10 +61,13 @@ todo: $(EXEC)
 	$(CC) $(INC) $(EXTRAS) $(CFLAGS) $(DC) -c $<
 
 mendieta.x: mendieta.o $(OBJS)
-	$(CC) $(CFLAGS) $^ -o $@ $(GSLL) $(LIBS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBS)
 
-prop.x: prop.o propiedades.o $(OBJS)
-	$(CC) $(CFLAGS) $^ -o $@ $(GSLL)
+prop.x: prop.o propiedades.old.o octree.o leesnap.o grid.o deltas.o variables.o io.c
+	$(CC) $(CFLAGS) $(EXTRAS) $^ -o $@ $(LIBS)
+
+limpiador.x: $(OBJS) limpiador.o limpieza.o
+	$(CC) $(CFLAGS) $(EXTRAS) $^ -o $@ $(GSLL)
 
 clean:
 	rm -rf $(OBJS)

@@ -10,7 +10,7 @@
 #include "propiedades.old.h"
 #include "deltas.h"
 
-void read_idenfof(void);
+void read_idenfof(char *file);
 char ffof[200],bfof[200];
 
 struct subst
@@ -23,34 +23,22 @@ int main(int argc, char **argv)
 {
 	int    i;
   double start,end;
-  char   filename[200];
-  char   fout[200];
-  char   fhijos[200];
+  char   filename[200],fout[200];
   FILE   *pfout, *pfin;
   FILE   *asco;
   struct propiedades_st Prop;
 
 	TIMER(start);
 
-  init_variables();
+  sprintf(fout,"propiedades.bin");
 
-  sprintf(filename,"%s",argv[1]);
-  pfin=fopen(filename,"r");
-	fscanf(pfin,"%d  \n",&snap.nfiles);
-  fscanf(pfin,"%s  \n",snap.root);
-	fscanf(pfin,"%s  \n",snap.name);
-	fscanf(pfin,"%s  \n",bfof);
-	fscanf(pfin,"%s  \n",ffof);
-	fscanf(pfin,"%s  \n",fout);
-  fscanf(pfin,"%s  \n",fhijos);
-	fscanf(pfin,"%lf \n",&cp.soft);
-	fclose(pfin);
+  init_variables(argc,argv);
 
   /* Lee archivos de la simulacion */
 	read_gadget();
 
   /* Lee archivo de la identificacion FoF */
-  read_idenfof();
+  read_idenfof(fof_file);
 
   /* Si no encuentra grupos, crea archivo vacio */
 	if(n_grupos_fof == 0)
@@ -63,15 +51,17 @@ int main(int argc, char **argv)
 		return(EXIT_SUCCESS);
 	}
 
-#ifdef COMPUTE_EP
+  #ifdef COMPUTE_EP
   /* Calcula energia potencial de las particulas */
   compute_potential_energy();
-#endif
+  #endif
 
   pfout = fopen(fout,"w");
   fprintf(stdout,"Abre archivo de salida: %s\n",fout);
 
+  #ifdef IDENSUB
   sub_hijos = (struct subst *) calloc((n_grupos_fof + 1),sizeof(struct subst));
+  #endif
 
   asco = fopen("propiedades.ascii","w");
 
@@ -79,10 +69,10 @@ int main(int argc, char **argv)
 	for(i = 1; i <= n_grupos_fof; i++)
 	{
 		fprintf(stdout,"Calculando prop. grupo %6d de %6d, nmem %d\n",
-                                           i,n_grupos_fof,groups[i].np);
+                                           i,n_grupos_fof,fof[i].np);
 		Prop = propiedades(P,i);
 
-    write_properties(pfout,Prop);
+    //write_properties(pfout,Prop);
 
     fprintf(asco,"%d %f %f %f %f %f %f\n",
 		     Prop.npart,Prop.pcm[0],Prop.pcm[1],Prop.pcm[2],Prop.vcm[0],Prop.vcm[1],Prop.vcm[2]);
@@ -94,12 +84,12 @@ int main(int argc, char **argv)
 //         Ep,Ec,aa,bb,cc,aa_vel,bb_vel,cc_vel);
     fflush(asco);
 
-#ifdef IDENSUB
+    #ifdef IDENSUB
     sub_hijos[i].pcm[0] = mostbound[0];
     sub_hijos[i].pcm[1] = mostbound[1];
     sub_hijos[i].pcm[2] = mostbound[2];
     sub_hijos[i].r200   = rvir;
-#endif
+    #endif
     
   }
 

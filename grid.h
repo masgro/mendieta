@@ -5,12 +5,11 @@
 #define NGRIDMAX 512
 #endif
 
-struct gridst
-{
-	unsigned long ngrid;
-	unsigned long nobj;
-	int *llirst;
-	int *ll;
+struct gridst{
+	my_int ngrid;
+	my_int nobj;
+	my_int *llirst;
+	my_int *ll;
 } grid;
 
 

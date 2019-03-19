@@ -12,22 +12,21 @@
 #define KERNEL_TABLE 10000
 
 #ifndef NPARTMIN
-#define NPARTMIN 20
+#define NPARTMIN 10
 #endif
-
 
 /* Precision del codigo (reales) */
 #ifdef PRECDOUBLE
-typedef double type_real;
+typedef double my_real;
 #else
-typedef float type_real;
+typedef float my_real;
 #endif
 
 /* Precision del codigo (enteros) */
 #ifdef LONGIDS
-typedef unsigned long long type_int;
+typedef unsigned long my_int;
 #else
-typedef unsigned int type_int;
+typedef unsigned int my_int;
 #endif
 
 size_t size_real;
@@ -35,35 +34,37 @@ size_t size_int;
 
 /* Posiciones, velocidades y energias de las partículas */
 struct particle_data {
-  type_real    Pos[3];
+  my_real Pos[3];
   #ifdef STORE_VELOCITIES
-  type_real    Vel[3];
+  my_real Vel[3];
   #endif
   #ifdef STORE_IDS
-  type_int     id;
+  my_int  id;
   #endif
-  type_int     indx;
-  int          gr;
-  unsigned int fof;
-  int          llfof;
+  //my_int  indx;
+  #ifdef READIDENFOF
+  my_int  fof;
+  #endif
+  my_int  llfof;
   #ifdef IDENSUB
-  unsigned int sub;
-  int          llsub;
+  my_int  sub;
+  my_int  llsub;
   #endif
   #ifdef ENERGIES
-  double       Ep, Ec;
+  double  Ep, Ec;
   #endif
+  my_int  gr;
 } *P;
 
 struct grupos{
-  int llirst;
-  unsigned int np;
-} *fof, *sub;
+  my_int llirst;
+  my_int np;
+} *fof, *sub, *groups;
 
-unsigned int np_in_fof;
-unsigned int np_in_sub;
-unsigned int n_grupos_fof;
-unsigned int n_grupos_sub;
+my_int np_in_fof;
+my_int np_in_sub;
+my_int n_grupos_fof;
+my_int n_grupos_sub;
 int  nfrac;
 char fof_file[200];
 char sub_file[200];

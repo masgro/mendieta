@@ -16,9 +16,9 @@ struct hijost
 struct subst
 {
   int np;
-  type_real vmax;
-  type_int *id;
-  type_int *indx;
+  my_real vmax;
+  my_int *id;
+  my_int *indx;
 } *lala;
 
 int main(int argc, void **argv)
@@ -29,10 +29,10 @@ int main(int argc, void **argv)
   unsigned np, npt, n;
   unsigned int ng, nobj;
   int id;
-  type_int idt;
-  type_int zero = 0;
-  type_int indx;
-  type_int i;
+  my_int idt;
+  my_int zero = 0;
+  my_int indx;
+  my_int i;
   int cuenta,cuenta1,tot;
 	char path[200];
   char filepegado[200],filesubin[200];
@@ -75,8 +75,8 @@ int main(int argc, void **argv)
 
     lala[i].np = np;
 
-    lala[i].id = (type_int *) malloc(np*sizeof(type_int));
-    lala[i].indx = (type_int *) malloc(np*sizeof(type_int));
+    lala[i].id = (my_int *) malloc(np*sizeof(my_int));
+    lala[i].indx = (my_int *) malloc(np*sizeof(my_int));
 
     for(j=0;j<np;j++)
     {
@@ -113,7 +113,7 @@ int main(int argc, void **argv)
 
   //pfin = fopen(fileprop,"r");
   //int idum;
-  //type_real fdum;
+  //my_real fdum;
   //for (i=0; i<ng; i++)
   //{
   //  fscanf(pfin,"%d %lf %lf %lf %lf %lf %lf ",

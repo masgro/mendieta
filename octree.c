@@ -21,9 +21,9 @@ static struct NODE *last;
 static int    numnodestotal;        /* total number of nodes */
 static int    MaxNodes;
 
-static type_real  xmin[3],xmax[3];
+static my_real xmin[3],xmax[3];
 
-static  int    N;
+static my_int  N;
 
 static float   knlrad  [KERNEL_LENGTH+1],
                knlpot  [KERNEL_LENGTH+1];
@@ -44,20 +44,21 @@ void force_treefree(void)
 }
 /************************************************************************/
 
-void add_particle_props_to_node(struct NODE *no, struct particle_data *Q, int p){
-  int i;
+void add_particle_props_to_node(struct NODE *no, struct particle_data *Q, my_int p){
+  my_int i;
   for( i = 0 ; i < 3 ; i++)
-    no->s[i] += (type_real)cp.Mpart * (Q[p].Pos[i] - no->center[i]);
+    no->s[i] += (my_real)cp.Mpart * (Q[p].Pos[i] - no->center[i]);
 
-  no->mass += (type_real)cp.Mpart;
+  no->mass += (my_real)cp.Mpart;
 }
 
 /* packs the particles of group 'gr' into into BH-trees */
-int force_treebuild(int np, struct particle_data *Q, float thetamax){
-  int    i,j;
+int force_treebuild(my_int np, struct particle_data *Q, float thetamax){
+  my_int i;
+  int j;
   int    subp,subi,p,subnode,fak;
-  type_real  length;
-  type_real  dx,dy,dz;
+  my_real  length;
+  my_real  dx,dy,dz;
   struct NODE *nfree,*th,*nn,*ff;
 
   N = np;
@@ -94,10 +95,10 @@ int force_treebuild(int np, struct particle_data *Q, float thetamax){
     nfree->suns[i] = 0;
   nfree->partind = 0;
 
-  nfree->mass = (type_real)cp.Mpart;
+  nfree->mass = (my_real)cp.Mpart;
 
   for(i = 0 ; i < 3 ; i++)
-    nfree->s[i] = (type_real)cp.Mpart*(Q[0].Pos[i] - nfree->center[i]);
+    nfree->s[i] = (my_real)cp.Mpart*(Q[0].Pos[i] - nfree->center[i]);
   
   /*inicializa la variable que apunta al hermano*/
   nfree->sibling = 0;
@@ -164,10 +165,10 @@ int force_treebuild(int np, struct particle_data *Q, float thetamax){
 
         nfree->partind = p;
 
-        nfree->mass = (type_real)cp.Mpart;
+        nfree->mass = (my_real)cp.Mpart;
 
         for(j = 0 ; j < 3 ; j++)
-          nfree->s[j] = (type_real)cp.Mpart*(Q[p].Pos[j] - nfree->center[j]);
+          nfree->s[j] = (my_real)cp.Mpart*(Q[p].Pos[j] - nfree->center[j]);
         
         th->partind = -1;
         th->suns[subp] = nfree;
@@ -217,10 +218,10 @@ int force_treebuild(int np, struct particle_data *Q, float thetamax){
       else
         nfree->center[j] -= nfree->len/2;
 
-    nfree->mass = (type_real)cp.Mpart;
+    nfree->mass = (my_real)cp.Mpart;
 
     for(j = 0 ; j < 3 ; j++)
-      nfree->s[j] = (type_real)cp.Mpart*(Q[i].Pos[j] - nfree->center[j]);
+      nfree->s[j] = (my_real)cp.Mpart*(Q[i].Pos[j] - nfree->center[j]);
 
     nfree->partind = i;
     th->suns[subi] = nfree;
@@ -249,7 +250,7 @@ int force_treebuild(int np, struct particle_data *Q, float thetamax){
       dy = th->s[1];
       dz = th->s[2];
     
-      th->oc  = (type_real)sqrt(dx*dx + dy*dy + dz*dz);
+      th->oc  = (my_real)sqrt(dx*dx + dy*dy + dz*dz);
       th->oc += th->len/(thetamax); 
       th->oc *= th->oc;     /* used in cell-opening criterion */
     }
@@ -297,7 +298,8 @@ void force_setupnonrecursive(struct NODE *no)
   int i;
   struct NODE *nn;
   
-  if(last) last->next = no;
+  if(last)
+    last->next = no;
 
   last = no;
   
@@ -310,15 +312,15 @@ void force_setupnonrecursive(struct NODE *no)
 
 
 /****************************************************************/
-void force_treeevaluate_potential(type_real *pos, double *pot){
+void force_treeevaluate_potential(my_real *pos, double *pot){
   struct NODE *no;
-  type_real r2,dx,dy,dz,r,u,h,ff;
-  type_real wp;
-  type_real h_inv;
-  type_real local_pot;
+  my_real r2,dx,dy,dz,r,u,h,ff;
+  my_real wp;
+  my_real h_inv;
+  my_real local_pot;
   int ii;
 
-  h = 2.8*(type_real)cp.soft;
+  h = 2.8*(my_real)cp.soft;
   h_inv = 1.0 / h;
 
   local_pot = 0.;
@@ -335,7 +337,7 @@ void force_treeevaluate_potential(type_real *pos, double *pot){
     r2 = dx*dx + dy*dy + dz*dz;
 
     if(no->partind >= 0){   /* single particle */
-      r = (type_real)sqrt(r2);  
+      r = (my_real)sqrt(r2);  
      
       u = r * h_inv;
 
@@ -354,7 +356,7 @@ void force_treeevaluate_potential(type_real *pos, double *pot){
       if(r2 < no->oc){
         no = no->next;  /* open cell */
       }else{
-        r = (type_real)sqrt(r2);  
+        r = (my_real)sqrt(r2);  
         u = r*h_inv;
     
         if(u >= 1){  /* ordinary quadrupol moment */

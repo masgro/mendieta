@@ -15,34 +15,31 @@
 #ifdef READIDENFOF
 void read_idenfof(char *file){
   FILE *pfin;
-  int i,j;
-  int imax,nmax,n,nt;
-  unsigned int idt;
-  unsigned int  _ng,_npg;
-  int count;
+  unsigned int n,nt,_ng,_npg,count,nmax;
+  my_int idt,imax,i,j;
 
-  for( i = 0 ; i < cp.npart ; i++ ) P[i].fof = 0;
+  for(i = 0; i < cp.npart; i++) P[i].fof = 0;
 
-  /**** File Grupos FOF ****/
+  /**** File FOF Groups ****/
   pfin = fopen(file,"r");
   printf("Open FoF groups file: %s\n",file);
 
   #ifdef NHALO
-  printf("Warning!.. running IDENSUB with NHALO option\n");
-  printf("IDENSUB will run only over fof halo %d \n",NHALO);
+  printf("Warning!.. running MENDIETA with NHALO option\n");
+  printf("MENDIETA will run only over fof halo %d\n",NHALO);
   #endif
 
   /**** LEE PARTICULAS EN GRUPOS FOF Y CREA LINKED LIST ****/
   n_grupos_fof  = 0;
   np_in_fof = 0;
-  nmax   = 0;
-  imax   = 0;
+  nmax  = 0;
+  imax  = 0;
   count = 0;
 
-  fread(&_ng,sizeof(int),1,pfin);
-  fread(&_npg,sizeof(int),1,pfin);
+  fread(&_ng,sizeof(unsigned int),1,pfin);
+  fread(&_npg,sizeof(unsigned int),1,pfin);
   while(1){
-    fread(&n,sizeof(int),1,pfin);
+    fread(&n,sizeof(unsigned int),1,pfin);
     if(feof(pfin))break;
     count++;
 
@@ -51,10 +48,10 @@ void read_idenfof(char *file){
     #ifdef NHALO
     if( count != NHALO ){
       for( i = 0 ; i < n ; i++ ){
-        fread(&idt,sizeof(int),1,pfin);
+        fread(&idt,sizeof(my_int),1,pfin);
       }
-      fread(&nt,sizeof(int),1,pfin);
-      assert(n==nt);
+      fread(&nt,sizeof(unsigned int),1,pfin);
+      assert(n == nt);
       continue;
     }
     #endif
@@ -65,13 +62,13 @@ void read_idenfof(char *file){
     if(n > nmax){nmax = n; imax = n_grupos_fof;}
 
     for(i = 0; i < n; i++){
-      fread(&idt,sizeof(int),1,pfin);
+      fread(&idt,sizeof(my_int),1,pfin);
 
       P[idt].fof = n_grupos_fof;
 
       np_in_fof++;
     }
-    fread(&nt,sizeof(int),1,pfin);
+    fread(&nt,sizeof(unsigned int),1,pfin);
     assert(n == nt);
   }
 
@@ -87,15 +84,15 @@ void read_idenfof(char *file){
   printf("Biggest FoF group ID = %d \n",imax);
 
   for(i = 0; i < 3; i++){
-    pmin[i] =  1.E26; 
-    pmax[i] = -1.E26;
+    pmin[i] =  1.E26; pmax[i] = -1.E26;
   }
 
   /*Reallocatea para liberar memoria*/
   j = 0;
-  int kk = 0;
   for(i = 0; i < cp.npart; i++){
-    if(P[i].fof == 0)continue;
+
+    if(P[i].fof == 0)
+      continue;
 
     P[j].Pos[0] = P[i].Pos[0];
     P[j].Pos[1] = P[i].Pos[1];
@@ -115,8 +112,10 @@ void read_idenfof(char *file){
     if(P[j].Pos[2] < pmin[2]) pmin[2] = P[j].Pos[2];
 
     P[j].fof    = P[i].fof;
+    #ifdef IDENSUB
     P[j].sub    = P[i].fof;
-    P[j].indx   = i;
+    #endif
+    //P[j].indx   = i;
     j++;
   }
   assert(j == np_in_fof);
@@ -157,22 +156,18 @@ void read_idenfof(char *file){
 }
 #endif
 
-void write_idenfof(char *fof_file){
-  char filename[200];
-  FILE *pffof;
-  unsigned int i;
-  int l;
-  unsigned int nobj, ng;
-#ifdef SUBBOXES
+void write_idenfof(char *filename){
+  FILE *pf;
+  my_int i, l, nobj, ng;
+  #ifdef SUBBOXES
   double xcm,ycm,zcm;
-#endif
+  #endif
 
 	gsl_permutation *index;
   gsl_vector_long *group;
 
-  sprintf(filename,"%s",fof_file);
-  pffof = fopen(filename,"w");
-  if(pffof == NULL){
+  pf = fopen(filename,"w");
+  if(pf == NULL){
     fprintf(stderr,"No se pudo abrir archivo: %s\n",filename);
     exit(EXIT_FAILURE);
   }
@@ -180,20 +175,20 @@ void write_idenfof(char *fof_file){
 
 #ifdef SUBBOXES
   for(i = 1; i < n_grupos_fof; i++){
-    if( fof[i].llirst == -1 || fof[i].np == 0) continue;
+    if(fof[i].np == 0) continue;
 
     xcm = 0.0;
     ycm = 0.0;
     zcm = 0.0;
 
     l = fof[ng].llirst;
-    while(l != -1){
+    do{
       xcm += (double)P[l].Pos[0];
       ycm += (double)P[l].Pos[1];
       zcm += (double)P[l].Pos[2];
 
       l = P[l].llfof;
-    }
+    }while(l != fof[ng].llirst);
 
     xcm /= (double)fof[i].np;
     ycm /= (double)fof[i].np;
@@ -213,7 +208,7 @@ void write_idenfof(char *fof_file){
 
   nobj = 0; ng = 0;   
   for(i = 0; i < n_grupos_fof; i++){
-    if( fof[i].llirst == -1 || fof[i].np == 0 || i == 0){
+    if(fof[i].np == 0 || i == 0){
       gsl_vector_long_set(group,i,0);
     }else{
       gsl_vector_long_set(group,i,fof[i].np);
@@ -227,38 +222,39 @@ void write_idenfof(char *fof_file){
   fprintf(stdout,"Numero Final de grupos FoF: %d\n",ng);
   fprintf(stdout,"Numero de particulas en grupos FoF: %d\n",nobj);
 
-  fwrite(&ng,sizeof(unsigned int),1,pffof);
-  fwrite(&nobj,sizeof(unsigned int),1,pffof);
+  fwrite(&ng,sizeof(unsigned int),1,pf);
+  fwrite(&nobj,sizeof(unsigned int),1,pf);
   
   for(i = n_grupos_fof - 1; i > 0; i--){
     ng = gsl_permutation_get(index,i); 
     if(fof[ng].np == 0)continue;
 
-    fwrite(&fof[ng].np,sizeof(unsigned int),1,pffof);
+    fwrite(&fof[ng].np,sizeof(unsigned int),1,pf);
 
     #ifdef DEBUG
     int k = 0;
     #endif
     l = fof[ng].llirst;
-    while(l != -1){
-      fwrite(&l,sizeof(int),1,pffof);
+    do{
+      fwrite(&l,sizeof(my_int),1,pf);
 
       //reasgina grupos fof a la particula l para que los grupos
       //este ordenados de mayor a menor
-      P[l].fof = n_grupos_fof - i ;
+      //P[l].fof = n_grupos_fof - i ;
 
       #ifdef DEBUG
       k++;
       #endif
 
-      l = P[l].llfof;
-    }
-    fwrite(&fof[ng].np,sizeof(unsigned int),1,pffof);
+      //l = P[l].llfof;
+      l = Temp.ll[l];
+    }while(l != fof[ng].llirst);
+    fwrite(&fof[ng].np,sizeof(unsigned int),1,pf);
     #ifdef DEBUG
     assert(k == fof[ng].np);
     #endif
   }
-  fclose(pffof);
+  fclose(pf);
 
   gsl_vector_long_free(group);
   gsl_permutation_free(index);
@@ -268,9 +264,9 @@ void write_idenfof(char *fof_file){
 void write_idensub(char *sub_file){
   char filename[200];
   FILE *pfsub, *pffof, *pfascii;
-  unsigned int nobj, ng;
-  unsigned int i;
-  int    j, l, count = 0;
+  my_int nobj, ng;
+  my_int i;
+  my_int j, l, count = 0;
   size_t it;
 
 	gsl_permutation *index;
@@ -296,7 +292,7 @@ void write_idensub(char *sub_file){
 
   nobj = 0; ng = 0;   
   for(i = 1 ;i < n_grupos_sub ;i++){
-    if( sub[i].llirst == -1 || sub[i].np == 0 )continue;
+    if(sub[i].np == 0)continue;
     nobj += sub[i].np;
     ng++;
   }
@@ -309,45 +305,47 @@ void write_idensub(char *sub_file){
   fwrite(&ng,sizeof(unsigned int),1,pfsub);
   fwrite(&nobj,sizeof(unsigned int),1,pfsub);
   
-  Temp.head   =          (int *) malloc(n_grupos_fof*sizeof(int));
-  Temp.npgrup = (unsigned int *) calloc(n_grupos_fof,sizeof(unsigned int));
-  Temp.ll     =          (int *) malloc(n_grupos_sub*sizeof(int));
-  Temp.grup   = (unsigned int *) calloc(n_grupos_sub,sizeof(unsigned int));
+  Temp.head   = (my_int *) malloc(n_grupos_fof*sizeof(my_int));
+  Temp.npgrup = (my_int *) calloc(n_grupos_fof,sizeof(my_int));
+  Temp.ll     = (my_int *) malloc(n_grupos_sub*sizeof(my_int));
+  Temp.grup   = (my_int *) calloc(n_grupos_sub,sizeof(my_int));
 
   Temp.grup[0] = 0;
   for(i = 1 ; i < n_grupos_sub ; i++){
-    if(sub[i].llirst == -1 || sub[i].np == 0) continue;
+    if(sub[i].np == 0) continue;
     j = sub[i].llirst;
     Temp.grup[i] = P[j].fof;
   }
 
-  for(i = 0; i < n_grupos_fof; i++)
-    Temp.head[i] = -1;
+  for(i = 0; i < n_grupos_sub; i++){
+    ng = Temp.grup[i];
+    Temp.head[ng] = i;
+    Temp.npgrup[ng]++;
+  }
 
   for(i = 0; i < n_grupos_sub; i++){
     ng = Temp.grup[i];
     Temp.ll[i] = Temp.head[ng];
     Temp.head[ng] = i;
-    Temp.npgrup[ng]++;
   }
 
   for(i = 1; i < n_grupos_fof; i++){
     if(Temp.npgrup[i] == 0) continue;
 
-    Temp.in     = (unsigned int *) malloc(Temp.npgrup[i]*sizeof(unsigned int));
+    Temp.in  = (my_int *) malloc(Temp.npgrup[i]*sizeof(my_int));
 
     group = gsl_vector_long_alloc(Temp.npgrup[i]);
     index = gsl_permutation_alloc(Temp.npgrup[i]);
 
     l = Temp.head[i]; j = 0;
-    while(l != -1){
+    do{
       gsl_vector_long_set(group,j,sub[l].np);
       Temp.in[j] = l;
 
       l = Temp.ll[l];
 
       j++;
-    }
+    }while(l != Temp.head[i]);
 
     #ifdef DEBUG
     assert(j == Temp.npgrup[i]);
@@ -371,7 +369,7 @@ void write_idensub(char *sub_file){
       int k = 0;
       #endif
       l = sub[ng].llirst;
-      while(l != -1){
+      do{
         #ifdef READIDENFOF
         fwrite(&P[l].indx,sizeof(int),1,pfsub);
         #else
@@ -381,7 +379,7 @@ void write_idensub(char *sub_file){
         #ifdef DEBUG
         k++;
         #endif
-      }
+      }while(l != sub[ng].llirst);
       fwrite(&sub[ng].np,sizeof(unsigned int),1,pfsub);
       
       #ifdef DEBUG
@@ -409,15 +407,33 @@ void write_idensub(char *sub_file){
 void get_positions(int ifrac){
   char filename[200];
   FILE *pfout;
-  int  i, l;
+  my_int i, l;
   sprintf(filename,"pos.%02d",ifrac);
   pfout = fopen(filename,"w");
   for(i = 0; i < n_grupos_sub; i++){
     l = sub[i].llirst;
-    while(l != -1){
+    do{
       fprintf(pfout,"%f %f %f %d\n",P[l].Pos[0],P[l].Pos[1],P[l].Pos[2],i);
       l = P[l].llsub;
-    }
+    }while(l != sub[i].llirst);
+  }
+  fclose(pfout);
+}
+#endif
+
+#ifdef GETINDEX
+void get_index(int ifrac){
+  char filename[200];
+  FILE *pfout;
+  my_int i, l;
+  sprintf(filename,"index.%02d",ifrac);
+  pfout = fopen(filename,"w");
+  for(i = 0; i < n_grupos_fof; i++){
+    l = fof[i].llirst;
+    do{
+      fprintf(pfout,"%d %d\n",l,i);
+      l = P[l].llfof;
+    }while(l != fof[i].llirst);
   }
   fclose(pfout);
 }

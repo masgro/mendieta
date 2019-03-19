@@ -4,4 +4,5 @@ void read_idenfof(char *fof_file);
 void write_idenfof(char *fof_file);
 void write_idensub(char *sub_file);
 void get_positions(int ifrac);
+void get_index(int ifrac);
 #endif

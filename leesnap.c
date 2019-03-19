@@ -8,8 +8,9 @@
 #include "colores.h"
 
 void read_gadget(void){
-  char filename[200];
-  int  ifile,ind;
+  char   filename[200];
+  int    ifile;
+  my_int ind;
   size_t total_memory;
 
   if(snap.nfiles>1)
@@ -21,7 +22,7 @@ void read_gadget(void){
 
   /****** ALLOCATACION TEMPORAL DE LAS PARTICULAS ****************/
   total_memory = (float)cp.npart*sizeof(struct particle_data)/1024.0/1024.0/1024.0;
-  printf("Allocating %.5zu Gb for %d particles\n",total_memory,cp.npart);
+  printf("Allocating %.5zu Gb for %lu particles\n",total_memory,(unsigned long)cp.npart);
   P = (struct particle_data *) malloc(cp.npart*sizeof(struct particle_data));
   assert(P != NULL);
 
@@ -83,7 +84,7 @@ void leeheader(char *filename){
   printf("*********************************** \n");
   printf("*   Parametros de la simulacion   * \n");
   printf("*********************************** \n");
-  printf("  Numero de particulas = %d \n", cp.npart);
+  printf("  Numero de particulas = %lu\n",(unsigned long)cp.npart);
   printf("  Lado del box = %g \n", cp.lbox);
   printf("  Redshift = %g \n", cp.redshift);
   printf("  Omega Materia = %g \n", cp.omegam);
@@ -95,15 +96,15 @@ void leeheader(char *filename){
   printf("*********************************** \n");
 }
 
-void lee(char *filename, struct particle_data *Q, int *ind){
+void lee(char *filename, struct particle_data *Q, my_int *ind){
   FILE *pf;
   int d1, d2;
   int k, pc, n;
   size_t ierr;
 
-  type_real r[3],v[3];
+  my_real r[3],v[3];
   #ifdef STORE_IDS
-  type_int id;
+  my_int id;
   #endif
  
   for(k = 0; k < 3; k++){
@@ -200,12 +201,12 @@ void lee(char *filename, struct particle_data *Q, int *ind){
   fclose(pf);
 }
 
-void change_positions(int n){
-  int ip, idim;
+void change_positions(my_int n){
+  my_int ip;
 
   RED("Inicio Change Positions\n");
 
-  for(idim = 0; idim < 3; idim++){
+  for(int idim = 0; idim < 3; idim++){
     pmin[idim] = 1.E26; 
     pmax[idim] = -1.E26;
   }
@@ -224,11 +225,11 @@ void change_positions(int n){
   printf("zmin %.1f zmax %.1f\n",pmin[2],pmax[2]);
 
   for(ip = 0; ip < n; ip++)
-    for(idim = 0; idim < 3; idim++)
+    for(int idim = 0; idim < 3; idim++)
       P[ip].Pos[idim] -= pmin[idim];
 
   cp.lbox = pmax[0] - pmin[0];
-  for(idim = 1; idim < 3; idim++)
+  for(int idim = 1; idim < 3; idim++)
     if(cp.lbox < (pmax[idim] - pmin[idim])) cp.lbox = (pmax[idim] - pmin[idim]);
 
   cp.lbox *= 1.001;
@@ -236,25 +237,25 @@ void change_positions(int n){
   GREEN("Fin Change Positions\n");
 }
 
-void re_change_positions(int n, struct particle_data *Q){
-  int ip, idim;
+void re_change_positions(my_int n, struct particle_data *Q){
+  my_int ip;
   for(ip = 0; ip < n; ip++)
-    for(idim = 0; idim < 3; idim++)
+    for(int idim = 0; idim < 3; idim++)
       Q[ip].Pos[idim] += pmin[idim];
 }
 
 void select_particles(void){
-  unsigned int i,j;
+  my_int i,j;
 
   fprintf(stdout,"Selecting particles within a subbox\n"); fflush(stdout);
   
   for(j = 0, i = 0; i < cp.npart; i++){
-    if((P[i].Pos[0] - box.cen[0]) >  cp.lbox/2.0) P[i].Pos[0] -= (type_real)cp.lbox;
-    if((P[i].Pos[0] - box.cen[0]) < -cp.lbox/2.0) P[i].Pos[0] += (type_real)cp.lbox;
-    if((P[i].Pos[1] - box.cen[1]) >  cp.lbox/2.0) P[i].Pos[1] -= (type_real)cp.lbox;
-    if((P[i].Pos[1] - box.cen[1]) < -cp.lbox/2.0) P[i].Pos[1] += (type_real)cp.lbox;
-    if((P[i].Pos[2] - box.cen[2]) >  cp.lbox/2.0) P[i].Pos[2] -= (type_real)cp.lbox;
-    if((P[i].Pos[2] - box.cen[2]) < -cp.lbox/2.0) P[i].Pos[2] += (type_real)cp.lbox;
+    if((P[i].Pos[0] - box.cen[0]) >  cp.lbox/2.0) P[i].Pos[0] -= (my_real)cp.lbox;
+    if((P[i].Pos[0] - box.cen[0]) < -cp.lbox/2.0) P[i].Pos[0] += (my_real)cp.lbox;
+    if((P[i].Pos[1] - box.cen[1]) >  cp.lbox/2.0) P[i].Pos[1] -= (my_real)cp.lbox;
+    if((P[i].Pos[1] - box.cen[1]) < -cp.lbox/2.0) P[i].Pos[1] += (my_real)cp.lbox;
+    if((P[i].Pos[2] - box.cen[2]) >  cp.lbox/2.0) P[i].Pos[2] -= (my_real)cp.lbox;
+    if((P[i].Pos[2] - box.cen[2]) < -cp.lbox/2.0) P[i].Pos[2] += (my_real)cp.lbox;
 
     ///////////////////////////////////////////////////
     if(P[i].Pos[0] < (box.cen[0]-(box.lado+box.franja)) || 

@@ -12,14 +12,14 @@ struct temporary {
 	unsigned int nsub_final;  
   unsigned int massive_one;
   unsigned int np_massive_one;
-	int np;          
-	int *head;
-	int *tail;
-	int *ll;
-	unsigned int *npgrup;
-	unsigned int *grup;
-	unsigned int *in;
-	type_real **vcm, **pcm;
+	my_int np;          
+	my_int *head;
+	my_int *tail;
+	my_int *ll;
+	my_int *npgrup;
+	my_int *grup;
+	my_int *in;
+	my_real **vcm, **pcm;
 } Temp;
 
 struct elemento {
@@ -32,8 +32,8 @@ void compute_velocity_position(void);
 void free_memory(void);
 void reasigna(void);
 void reasigna_closest(void);
-void limpieza_new(int ig, int destino);
-void compute_potential_energy_subgrupo(int npart,struct particle_data *Q, int *iEpmin);
+void limpieza_new(my_int ig, my_int destino);
+void compute_potential_energy_subgrupo(my_int npart,struct particle_data *Q, my_int *iEpmin);
 void compute_potential_energy(void);
 void only_one_substructure(int k, int contador);
 #endif

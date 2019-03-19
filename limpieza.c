@@ -18,18 +18,17 @@ int n_free_particles;
 
 #ifdef IDENSUB
 void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
-  unsigned int i, k, grupo;
+  unsigned int i, k, l, grupo;
   unsigned int contador;
-  int l;
   struct elemento *curr;
-  int *test;
+  bool *test;
 
   #ifdef DEBUG
   int j, l1, l2, l3;
   #endif
 
   fprintf(stdout,"Clean up begins.... n_grupos_sub %d\n",n_grupos_sub);
-  test = (int *) calloc(ngrupos/32 + 1,sizeof(int));
+  test = (bool *) calloc(ngrupos,sizeof(bool));
 
   for(i = 0; i < cp.npart; i++)
     P[i].sub = 0;
@@ -69,8 +68,8 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
         curr->next = head_free_particles;
         head_free_particles = curr;
       }
-      else if(!TestBit(test,grupo)) //Checkear que este subgrupo no este en la lista
-      {
+      else if(!TestBit(test,grupo)) { //Checkear que este subgrupo no este en la lista
+
         #ifdef DEBUG
         assert(Temp.npgrup[grupo] >= NPARTMIN);
         #endif
@@ -127,14 +126,14 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
 
     #ifdef ASSIGN_CLOSEST_GROUP
     /* Calcula velocidades y posicion de los subhalos con mas de NPARTMIN part */
-    Temp.vcm    = (type_real **) malloc(3*sizeof(type_real*));
-    Temp.vcm[0] = (type_real *)  malloc(ngrupos*sizeof(type_real));
-    Temp.vcm[1] = (type_real *)  malloc(ngrupos*sizeof(type_real));
-    Temp.vcm[2] = (type_real *)  malloc(ngrupos*sizeof(type_real));
-    Temp.pcm    = (type_real **) malloc(3*sizeof(type_real*));
-    Temp.pcm[0] = (type_real *)  malloc(ngrupos*sizeof(type_real));
-    Temp.pcm[1] = (type_real *)  malloc(ngrupos*sizeof(type_real));
-    Temp.pcm[2] = (type_real *)  malloc(ngrupos*sizeof(type_real));
+    Temp.vcm    = (my_real **) malloc(3*sizeof(my_real*));
+    Temp.vcm[0] = (my_real *)  malloc(ngrupos*sizeof(my_real));
+    Temp.vcm[1] = (my_real *)  malloc(ngrupos*sizeof(my_real));
+    Temp.vcm[2] = (my_real *)  malloc(ngrupos*sizeof(my_real));
+    Temp.pcm    = (my_real **) malloc(3*sizeof(my_real*));
+    Temp.pcm[0] = (my_real *)  malloc(ngrupos*sizeof(my_real));
+    Temp.pcm[1] = (my_real *)  malloc(ngrupos*sizeof(my_real));
+    Temp.pcm[2] = (my_real *)  malloc(ngrupos*sizeof(my_real));
 
     compute_velocity_position();
     #endif
@@ -149,7 +148,7 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
     #endif
 
     #ifdef DEBUG
-    assert(Temp.npgrup[Temp.massive_one] == Temp.np_massive_one + n_free_particles);
+    //assert(Temp.npgrup[Temp.massive_one] == Temp.np_massive_one + n_free_particles);
     #endif
 
     Temp.np_massive_one = Temp.npgrup[Temp.massive_one];
@@ -246,8 +245,8 @@ void compute_velocity_position(){
     }
 
     for(idim = 0; idim < 3; idim++){
-      Temp.vcm[idim][ig] /= (type_real)Temp.npgrup[ig];
-      Temp.pcm[idim][ig] /= (type_real)Temp.npgrup[ig];
+      Temp.vcm[idim][ig] /= (my_real)Temp.npgrup[ig];
+      Temp.pcm[idim][ig] /= (my_real)Temp.npgrup[ig];
     }
 
     curr = curr->next;
@@ -280,7 +279,7 @@ void reasigna_closest(void){
   int ig,ip,idim;
   int destino;
   struct elemento *curr, *curr_gr;
-  type_real dp[3], dv[3], dis, E, Ep, Ec;
+  my_real dp[3], dv[3], dis, E, Ep, Ec;
 
   curr = head_free_particles;
   while(curr != NULL){
@@ -306,11 +305,11 @@ void reasigna_closest(void){
         Ec += dv[idim]*dv[idim];
       }
 	    dis  = sqrt(dis);
-	  	dis += (type_real)cp.soft;
+	  	dis += (my_real)cp.soft;
 
       Ec *= 0.5;
 
-	  	Ep = (type_real)Temp.npgrup[ig]/dis;
+	  	Ep = (my_real)Temp.npgrup[ig]/dis;
 	    Ep += (1./cp.soft);   /* Autoenergia */
 	    Ep *= (GCONS*cp.Mpart*Msol*1.E10/Kpc/cp.aexp);
 	  	Ep *= (-1.);          /* Cambio de signo para que Ep sea negativa */
@@ -369,28 +368,33 @@ void reasigna(void){
 }
 #endif
 
-void limpieza_new(int ig, int destino){
-  int    i,j,k,n_unbound,temp,iEpmin;
+void limpieza_new(my_int ig, my_int destino){
+  my_int i,j,k,n_unbound,temp,iEpmin;
+  my_int *lista;
   int    dim;
-  int    *lista;
   double pcm[3],vcm[3];
   double dv[3];
   double E;
   struct particle_data *Q;
-  int npart = Temp.npgrup[ig];
+  my_int npart = Temp.npgrup[ig];
   //int destino = Temp.massive_one;
+  my_int *indices;
 
-  type_real xmin[3], xmax[3];
+  my_real xmin[3], xmax[3];
   xmin[0] = 1.E26; xmax[0] = -1.E26;
   xmin[1] = 1.E26; xmax[1] = -1.E26;
   xmin[2] = 1.E26; xmax[2] = -1.E26;
 
+  printf("%u %u %u\n",ig,destino,npart);
+
   Q	= (struct particle_data *) malloc(npart*sizeof(struct particle_data));
   assert(Q != NULL);
+  indices = (my_int *) malloc(npart*sizeof(my_int));
+  assert(indices != NULL);
 
   j = 0;
   k = Temp.head[ig];
-  while(k != -1){
+  do{
     Q[j].Pos[0] = P[k].Pos[0];
 		Q[j].Pos[1] = P[k].Pos[1];
 		Q[j].Pos[2] = P[k].Pos[2];
@@ -398,7 +402,7 @@ void limpieza_new(int ig, int destino){
 		Q[j].Vel[1] = P[k].Vel[1];
 		Q[j].Vel[2] = P[k].Vel[2];
     Q[j].gr     = P[k].gr;
-    Q[j].indx   = k;
+    indices[j]  = k;
     Q[j].Ep     = 0.0;
     Q[j].Ec     = 0.0;
 
@@ -411,7 +415,7 @@ void limpieza_new(int ig, int destino){
 
     j++;
     k = Temp.ll[k];
-  }
+  }while(k != Temp.head[ig]);
 
   #ifdef DEBUG
   assert(j == npart);
@@ -448,11 +452,11 @@ void limpieza_new(int ig, int destino){
 
 	for(i = 0; i < npart; i++)
     for(dim = 0; dim < 3; dim++){
-      Q[i].Pos[dim] -= (type_real)pcm[dim];
-      Q[i].Vel[dim] -= (type_real)vcm[dim];
+      Q[i].Pos[dim] -= (my_real)pcm[dim];
+      Q[i].Vel[dim] -= (my_real)vcm[dim];
     }
 
-  lista = (int *) calloc(npart,sizeof(int));
+  lista = (my_int *) calloc(npart,sizeof(my_int));
   assert(lista != NULL);
 
   n_unbound = 0;
@@ -480,7 +484,7 @@ void limpieza_new(int ig, int destino){
     }
   }
 
-  lista = (int *) realloc(lista,n_unbound*sizeof(int));
+  lista = (my_int *) realloc(lista,n_unbound*sizeof(my_int));
 
   /** Si luego de limpiar el grupo se queda con menos de NPARTMIN
       lo disolvemos totalmente, y todas su particulas se las damos
@@ -492,27 +496,25 @@ void limpieza_new(int ig, int destino){
     j = 0;
     #endif
     k = Temp.head[ig];
-    while(k != -1){
+    do{
       temp = Temp.ll[k];
-
       #ifdef DEBUG
       j++;
       #endif
-
       P[k].gr = destino;
-      Temp.ll[k] = Temp.head[destino];
-      Temp.head[destino] = k;
-      Temp.npgrup[destino]++;
+//      Temp.ll[k] = Temp.head[destino];
+//      Temp.head[destino] = k;
+//      Temp.npgrup[destino]++;
 
       k = temp;
-    }
+    }while(k != Temp.head[ig]);
 
     #ifdef DEBUG
     assert(j == npart);
     #endif
 
     Temp.npgrup[ig] = 0;
-    Temp.head[ig]   = -1;
+    Temp.head[ig]   = 0;
   }else if(n_unbound > 0)
   /** Si se queda con mas de NPARTMIN entonces las no-ligadas
       se las damos al grupo mas masivo, y luego reconstruimos
@@ -520,43 +522,50 @@ void limpieza_new(int ig, int destino){
   {
     for(i = 0; i < n_unbound; i++){
       k = lista[i];
-
-      Q[k].gr = -1;
-      k = Q[k].indx;
-
+      k = indices[k];
       P[k].gr = destino;
-      Temp.ll[k] = Temp.head[destino];
-      Temp.head[destino] = k;
-      Temp.npgrup[destino]++;
+      //Temp.ll[k] = Temp.head[destino];
+      //Temp.head[destino] = k;
+      //Temp.npgrup[destino]++;
     }
 
     /***Regenera la linked list para el subgrupo ig******/
-    Temp.head[ig]  = -1;
+    //Temp.head[ig]  = -1;
     Temp.npgrup[ig] = 0;
 
-    #ifdef DEBUG
     j = 0;
-    #endif
     for(i = 0; i < npart; i++){
-      if(Q[i].gr == -1)continue;
+      if(indices[i] == lista[j]){
+        j++;
+        continue;
+      }
 
+      k = indices[i];
       #ifdef DEBUG
-      j++;
-      assert(Q[i].gr == ig);
+      assert(P[k].gr == ig);
       #endif
+      Temp.head[ig] = k;
+      Temp.npgrup[ig]++;
+    }
 
-      k = Q[i].indx;
+    j = 0;
+    for(i = 0; i < npart; i++){
+      if(indices[i] == lista[j]){
+        j++;
+        continue;
+      }
+
+      k = indices[i];
       #ifdef DEBUG
       assert(P[k].gr == ig);
       #endif
 
       Temp.ll[k] = Temp.head[ig];
       Temp.head[ig] = k;
-      Temp.npgrup[ig]++;
+      //Temp.npgrup[ig]++;
     }
 
     #ifdef DEBUG
-    assert((j + n_unbound) == npart);
     assert(Temp.npgrup[ig] >= NPARTMIN);
     #endif
     /****************************************************/
@@ -566,8 +575,8 @@ void limpieza_new(int ig, int destino){
   free(lista);
 }
 
-void compute_potential_energy_subgrupo(int npart, struct particle_data *Q, int *iEpmin){
-  int    i,j,dim,iEpmin_local = -1;
+void compute_potential_energy_subgrupo(my_int npart, struct particle_data *Q, my_int *iEpmin){
+  my_int i,j,dim,iEpmin_local = -1;
   float  Theta = 0.45;
   double dx[3],dis,Epmin;
 
