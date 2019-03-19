@@ -1,0 +1,14 @@
+32
+/mnt/sersic2/marioagustin/1024_100Mpc/snapshots/
+snapshot_101
+fof.bin
+sub.bin
+9.0
+9
+
+###################################
+
+# 1 - Numero de files 
+# 2 - Path de la simulacion
+# 3 - Nombre de sanpshot
+# 4 - Nombre file de salida
