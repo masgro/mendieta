@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
 #include "variables.h"
 #include "cosmoparam.h"
 #include "leesnap.h"
@@ -8,24 +9,34 @@
 void init_variables(int argc, char **argv){
   FILE *pfin;
   char filename[200];
+  int ierr;
 
   RED("Initializing variables...\n");
 
-  size_real = sizeof(type_real);
-  fprintf(stdout,"type_real: %zu\n",size_real);
+  size_real = sizeof(my_real);
+  fprintf(stdout,"size_real: %zu\n",size_real);
 
-  size_int  = sizeof(type_int);
-  fprintf(stdout,"type_int:  %zu\n",size_int);
+  size_int  = sizeof(my_int);
+  fprintf(stdout,"size_int:  %zu\n",size_int);
 
   sprintf(filename,"%s",argv[1]);
   pfin = fopen(filename,"r");
-  fscanf(pfin,"%d  \n",&snap.nfiles);
-  fscanf(pfin,"%s  \n",snap.root);
-  fscanf(pfin,"%s  \n",snap.name);
-  fscanf(pfin,"%s  \n",fof_file);
-  fscanf(pfin,"%s  \n",sub_file);
-  fscanf(pfin,"%lf \n",&cp.soft);
-  fscanf(pfin,"%d  \n",&nfrac);
+  assert(pfin != NULL);
+
+  ierr = fscanf(pfin,"%d  \n",&snap.nfiles);
+  assert(ierr == 1);
+  ierr = fscanf(pfin,"%s  \n",snap.root);
+  assert(ierr == 1);
+  ierr = fscanf(pfin,"%s  \n",snap.name);
+  assert(ierr == 1);
+  ierr = fscanf(pfin,"%s  \n",fof_file);
+  assert(ierr == 1);
+  ierr = fscanf(pfin,"%s  \n",sub_file);
+  assert(ierr == 1);
+  ierr = fscanf(pfin,"%lf \n",&cp.soft);
+  assert(ierr == 1);
+  ierr = fscanf(pfin,"%d  \n",&nfrac);
+  assert(ierr == 1);
   fclose(pfin);
   
   BLUE("********** Information ***********\n");

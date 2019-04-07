@@ -9,7 +9,6 @@
 
 void grid_init(void)
 {
-  int i;
   unsigned long nalloc = grid.ngrid*grid.ngrid*grid.ngrid;
 
   printf("allocating %.5f gb\n",

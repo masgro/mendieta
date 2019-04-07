@@ -8,13 +8,12 @@ void re_change_positions(int n, struct particle_data *Q);
 void read_gadget();
 void select_particles(void);
 
-
-static type_real pmin[3], pmax[3];
+static my_real pmin[3], pmax[3];
 
 /*Input and output files*/
 struct SnapST{
   int nfiles;
-  char root[200], name[200]; 
+  char root[80], name[80]; 
 } snap;
 
 struct io_header{
@@ -35,10 +34,10 @@ struct io_header{
 } header;
 
 struct box_st{
-  type_real cen[3];
-  type_real max[3];
-  type_real min[3];
-  type_real franja;
-  type_real lado;
+  my_real cen[3];
+  my_real max[3];
+  my_real min[3];
+  my_real franja;
+  my_real lado;
 } box;
 #endif

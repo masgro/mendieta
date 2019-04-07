@@ -21,8 +21,7 @@ void linkedlist_grupos(int ngrupos, int *head, unsigned int *npgrupo, int npart,
 void sub_groups(void);
 void fof_groups(void);
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv){
   int    i,init_ifrac,ifrac;
   double frac,start,end;
 
@@ -34,10 +33,10 @@ int main(int argc, char **argv)
   #ifdef SUBBOXES
   YELLOW("SUBBOXES ACTIVED\n");
   assert(argc >= 6);
-  box.cen[0] = (type_real) atof(argv[2]);
-  box.cen[1] = (type_real) atof(argv[3]);
-  box.cen[2] = (type_real) atof(argv[4]);
-  box.lado   = (type_real) atof(argv[5]);
+  box.cen[0] = (my_real) atof(argv[2]);
+  box.cen[1] = (my_real) atof(argv[3]);
+  box.cen[2] = (my_real) atof(argv[4]);
+  box.lado   = (my_real) atof(argv[5]);
   box.franja = 1000.0;
   box.min[0] = box.franja;
   box.max[0] = box.franja + 2.0*box.lado;
@@ -80,7 +79,7 @@ int main(int argc, char **argv)
   #endif
 
   for(ifrac = init_ifrac; ifrac <= nfrac; ifrac++){
-    fprintf(stdout, "\nBegins Identification : Step %d of %d \n",ifrac,nfrac);
+    fprintf(stdout, "\n Begins Identification : Step %d of %d \n",ifrac,nfrac);
     
     frac  = 1.0f/(float)(nfrac + 1);
     frac *= (float)(nfrac + 1 - ifrac);
@@ -113,11 +112,11 @@ int main(int argc, char **argv)
     else
       sub_groups();
     #endif
-    
+
     #ifdef GETPOSITIONS
     get_positions(ifrac);
     #endif
-    
+
     free(Temp.head);
     free(Temp.npgrup);
     free(Temp.ll);

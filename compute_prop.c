@@ -3,16 +3,17 @@
 #include <math.h>
 #include <assert.h>
 #include <omp.h>
+#include <string.h>
 
 #include "variables.h"
 #include "colores.h"
 #include "cosmoparam.h"
-#include "leesnap.h"
 #include "octree.h"
 #include "deltas.h"
 #include "timer.h"
 #include "compute_prop.h"
 #include "deltas.h"
+#include "tools.h"
 
 #include <gsl/gsl_permutation.h>
 #include <gsl/gsl_vector_float.h>
@@ -145,16 +146,13 @@ void propiedades(struct particle_data *P, struct grupos *g, int gid, struct prop
   int    dim,l,i,j;
   int    indx,iepmin;
   int    i200, ivir;
-  float  drt;
-  type_real  dx[3],dv[3];
-  float a,lbox2,Epmin;
+  my_real  dx[3],dv[3];
+  float a,Epmin;
   gsl_vector_float *_dis;
   gsl_permutation  *_ind;
-  struct node *current;
   struct particle_data *Q;
   struct propiedades_st Prop = *PropIN;
 
-  lbox2 = (float)cp.lbox*0.5f;
   a = (1.0 / (1.0 + cp.redshift));
 
   Prop.npart = g[gid].np;
@@ -179,7 +177,6 @@ void propiedades(struct particle_data *P, struct grupos *g, int gid, struct prop
     Q[i].Vel[2] = P[l].Vel[2];
 
     for(dim = 0; dim < 3; dim++){
-      drt = Q[i].Pos[dim] - Q[0].Pos[dim];
       Prop.pcm[dim] += Q[i].Pos[dim];
       Prop.vcm[dim] += Q[i].Vel[dim];
     }
@@ -200,8 +197,8 @@ void propiedades(struct particle_data *P, struct grupos *g, int gid, struct prop
   #endif
 
   for(dim = 0; dim < 3; dim++){
-    Prop.pcm[dim] /= (type_real)Prop.npart;
-    Prop.vcm[dim] /= (type_real)Prop.npart;
+    Prop.pcm[dim] /= (my_real)Prop.npart;
+    Prop.vcm[dim] /= (my_real)Prop.npart;
   }
 
   /* Si el halo tiene menos de 1000 particulas calcula la energia
@@ -423,12 +420,12 @@ void forma(char *flag,struct particle_data *Q, struct propiedades_st *PropIN){
 
   evec = gsl_matrix_alloc(3, 3);
 
-  if( flag == "pos"){
+  if(!strcmp(flag,"pos")){
     Prop.aa = 0.0;
     Prop.cc = 0.0;
     Prop.bb = 0.0;
   }
-  if( flag == "vel"){
+  if(!strcmp(flag,"vel")){
     Prop.aa_vel = 0.0;
     Prop.cc_vel = 0.0;
     Prop.bb_vel = 0.0;
@@ -440,9 +437,9 @@ void forma(char *flag,struct particle_data *Q, struct propiedades_st *PropIN){
     for(j = 0; j < 3; j++){
       I[i][j] = 0. ;
       for(k = 0; k < Prop.npart ; k++){
-        if( flag == "pos")
+        if(!strcmp(flag,"pos"))
           I[i][j] += ((Q[k].Pos[i]-Prop.pcm[i]) * (Q[k].Pos[j]-Prop.pcm[j]));
-        if( flag == "vel")
+        if(!strcmp(flag,"vel"))
           I[i][j] += ((Q[k].Vel[i]-Prop.vcm[i]) * (Q[k].Vel[j]-Prop.vcm[j])) ;
       }
       data[kk]=I[i][j]/(double)Prop.npart;
@@ -456,13 +453,13 @@ void forma(char *flag,struct particle_data *Q, struct propiedades_st *PropIN){
   gsl_eigen_symmv_free (w);
   gsl_eigen_symmv_sort (eval, evec, GSL_EIGEN_SORT_ABS_ASC);
 
-  if( flag == "pos"){
+  if(!strcmp(flag,"pos")){
     Prop.cc = (float) gsl_vector_get (eval, 0);
     Prop.bb = (float) gsl_vector_get (eval, 1);
     Prop.aa = (float) gsl_vector_get (eval, 2);
     Prop.evec = evec;
   }
-  if( flag == "vel"){
+  if(!strcmp(flag,"vel")){
     Prop.cc_vel = (float) gsl_vector_get (eval, 0);
     Prop.bb_vel = (float) gsl_vector_get (eval, 1);
     Prop.aa_vel = (float) gsl_vector_get (eval, 2);
@@ -473,8 +470,8 @@ void forma(char *flag,struct particle_data *Q, struct propiedades_st *PropIN){
 }
 
 void write_properties(FILE *pfout, struct propiedades_st *PropIN){
-  int   jj;
-  float tmp[3];
+  //int   jj;
+  //float tmp[3];
   struct propiedades_st Prop = *PropIN;
 
   fwrite(&Prop.npart,sizeof(int),1,pfout);
@@ -520,32 +517,32 @@ void read_properties(FILE *pfin,struct propiedades_st Prop){
   size_t sizei = sizeof(Prop.npart);
   size_t sizer = sizeof(float);
  
-  fread(&Prop.npart,sizei,1,pfin);
-  fread(&Prop.pcm,size_real,3,pfin);
-  fread(&Prop.vcm,size_real,3,pfin);
-  fread(&Prop.mostbound,size_real,3,pfin);
-  fread(&Prop.sig,size_real,3,pfin);
-  fread(&Prop.L,size_real,3,pfin);
-  fread(&Prop.lambda,size_real,1,pfin);
-  fread(&Prop.m200,size_real,1,pfin);
-  fread(&Prop.r200,size_real,1,pfin);
-  fread(&Prop.v200,size_real,1,pfin);
-  fread(&Prop.mvir,size_real,1,pfin);
-  fread(&Prop.rvir,size_real,1,pfin);
-  fread(&Prop.vvir,size_real,1,pfin);
-  fread(&Prop.vmax,size_real,1,pfin);
-  fread(&Prop.Ep,size_real,1,pfin);
-  fread(&Prop.Ec,size_real,1,pfin);
-  fread(&Prop.aa,sizer,1,pfin);
-  fread(&Prop.bb,sizer,1,pfin);
-  fread(&Prop.cc,sizer,1,pfin);
+  my_fread(&Prop.npart,sizei,1,pfin);
+  my_fread(&Prop.pcm,size_real,3,pfin);
+  my_fread(&Prop.vcm,size_real,3,pfin);
+  my_fread(&Prop.mostbound,size_real,3,pfin);
+  my_fread(&Prop.sig,size_real,3,pfin);
+  my_fread(&Prop.L,size_real,3,pfin);
+  my_fread(&Prop.lambda,size_real,1,pfin);
+  my_fread(&Prop.m200,size_real,1,pfin);
+  my_fread(&Prop.r200,size_real,1,pfin);
+  my_fread(&Prop.v200,size_real,1,pfin);
+  my_fread(&Prop.mvir,size_real,1,pfin);
+  my_fread(&Prop.rvir,size_real,1,pfin);
+  my_fread(&Prop.vvir,size_real,1,pfin);
+  my_fread(&Prop.vmax,size_real,1,pfin);
+  my_fread(&Prop.Ep,size_real,1,pfin);
+  my_fread(&Prop.Ec,size_real,1,pfin);
+  my_fread(&Prop.aa,sizer,1,pfin);
+  my_fread(&Prop.bb,sizer,1,pfin);
+  my_fread(&Prop.cc,sizer,1,pfin);
   for(jj = 0; jj < 3; jj++){
-    fread(&tmp,sizer,3,pfin);
+    my_fread(&tmp,sizer,3,pfin);
   }
-  fread(&Prop.aa_vel,sizer,1,pfin);
-  fread(&Prop.bb_vel,sizer,1,pfin);
-  fread(&Prop.cc_vel,sizer,1,pfin);
+  my_fread(&Prop.aa_vel,sizer,1,pfin);
+  my_fread(&Prop.bb_vel,sizer,1,pfin);
+  my_fread(&Prop.cc_vel,sizer,1,pfin);
   for(jj = 0; jj < 3; jj++){
-    fread(&tmp,sizer,3,pfin);
+    my_fread(&tmp,sizer,3,pfin);
   }
 }

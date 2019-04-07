@@ -28,7 +28,7 @@ void identification(void)
     fprintf(stdout,"Using NGRIDMAX = %d\n",NGRIDMAX);
     grid.ngrid = NGRIDMAX;
   }
-  
+
   grid.nobj = iden.nobj;
   grid.step = iden.step;
 
@@ -45,7 +45,7 @@ void identification(void)
   omp_set_dynamic(0);
   omp_set_num_threads(NTHREADS);
   #endif
-    
+
   fprintf(stdout,"Comienza identificacion.....\n");
 
   printf("\nRunning on %d threads\n",NTHREADS);
@@ -207,17 +207,19 @@ void busv_rec(int ic, int *test)
   long ix, iy, iz;
   long ixx, iyy, izz;
   long ibox;
-  type_real xx, yy, zz;
-  type_real dis;
+  my_real xx, yy, zz;
+  my_real dis;
   int i;
-  type_real lbox,fac,lbox2;
+  my_real lbox,fac;
   long ngrid;
 
 
   ngrid = grid.ngrid;
   lbox  = cp.lbox;
-  fac   = (type_real)ngrid/lbox;
-  lbox2 = lbox/2.0;
+  fac   = (my_real)ngrid/lbox;
+#ifdef PERIODIC
+  my_real lbox2 = lbox/2.0;
+#endif
 
   ixc  = (int)(P[ic].Pos[0]*fac);
   ixci = ixc - 1;
@@ -242,7 +244,7 @@ void busv_rec(int ic, int *test)
     ix = ixx;
     #ifdef PERIODIC
     if(ix >= ngrid) ix = ix - ngrid;
-     if(ix < 0) ix = ix + ngrid;
+    if(ix < 0) ix = ix + ngrid;
     #endif
     for( iyy = iyci ; iyy <= iycf ; iyy++){
       iy = iyy;

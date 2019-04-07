@@ -13,7 +13,7 @@ void peano_hilbert()
   int *Id;
   struct peano_hilbert_data *mp;
   peanokey MinTot = (((peanokey)1)<<(3*BITS_PER_DIMENSION));
-  type_real DomainFac = 1.0 / (cp.lbox*1.001) * (((peanokey) 1) << (BITS_PER_DIMENSION));
+  my_real DomainFac = 1.0 / (cp.lbox*1.001) * (((peanokey) 1) << (BITS_PER_DIMENSION));
 
   printf("Comienza Peano-Hilbert...\n");
 

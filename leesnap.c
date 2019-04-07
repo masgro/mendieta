@@ -6,6 +6,7 @@
 #include "cosmoparam.h"
 #include "leesnap.h"
 #include "colores.h"
+#include "tools.h"
 
 void read_gadget(void){
   char filename[200];
@@ -52,9 +53,9 @@ void leeheader(char *filename){
     exit(EXIT_FAILURE);
   }
 
-  fread(&d1, sizeof(d1), 1, pf);
-  fread(&header, sizeof(header), 1, pf);
-  fread(&d2, sizeof(d2), 1, pf);
+  my_fread(&d1, sizeof(d1), 1, pf);
+  my_fread(&header, sizeof(header), 1, pf);
+  my_fread(&d2, sizeof(d2), 1, pf);
   assert(d1==d2);
   fclose(pf);
 
@@ -96,8 +97,8 @@ void lee(char *filename, struct particle_data *Q, int *ind){
   int d1, d2;
   int k, pc, n;
 
-  type_real r[3],v[3];
-  type_int id;
+  my_real r[3],v[3];
+  my_int id;
  
   for(k = 0; k < 3; k++){
     pmin[k] = 1.E26; 
@@ -112,15 +113,15 @@ void lee(char *filename, struct particle_data *Q, int *ind){
 
   fprintf(stdout,"Reading file: %s \n",filename); fflush(stdout);
 
-  fread(&d1, sizeof(d1), 1, pf);
-  fread(&header, sizeof(header), 1, pf);
-  fread(&d2, sizeof(d2), 1, pf);
+  my_fread(&d1, sizeof(d1), 1, pf);
+  my_fread(&header, sizeof(header), 1, pf);
+  my_fread(&d2, sizeof(d2), 1, pf);
   assert(d1==d2);
 
-  fread(&d1, sizeof(d1), 1, pf);
+  my_fread(&d1, sizeof(d1), 1, pf);
   for(k = 0, pc = 0; k < 6; k++){
     for(n = 0; n < header.npart[k]; n++){
-      fread(&r[0], size_real, 3, pf);
+      my_fread(&r[0], size_real, 3, pf);
       if(k == 1){ /*ONLY KEEP DARK MATTER PARTICLES*/
         Q[*ind+pc].Pos[0] = r[0]*POSFACTOR;
         Q[*ind+pc].Pos[1] = r[1]*POSFACTOR;
@@ -137,14 +138,14 @@ void lee(char *filename, struct particle_data *Q, int *ind){
       }
     }
   }
-  fread(&d2, sizeof(d2), 1, pf);
+  my_fread(&d2, sizeof(d2), 1, pf);
   assert(d1==d2);
 
-  fread(&d1, sizeof(d1), 1, pf);
+  my_fread(&d1, sizeof(d1), 1, pf);
 #ifdef STORE_VELOCITIES
   for(k = 0, pc = 0; k < 6; k++){
     for(n = 0; n < header.npart[k]; n++){
-      fread(&v[0], size_real, 3, pf);
+      my_fread(&v[0], size_real, 3, pf);
       if(k == 1){ /*ONLY KEEP DARK MATTER PARTICLES*/
         Q[*ind+pc].Vel[0] = v[0]*VELFACTOR;
         Q[*ind+pc].Vel[1] = v[1]*VELFACTOR;
@@ -156,14 +157,14 @@ void lee(char *filename, struct particle_data *Q, int *ind){
 #else
   fseek(pf,d1,SEEK_CUR);
 #endif
-  fread(&d2, sizeof(d2), 1, pf);
+  my_fread(&d2, sizeof(d2), 1, pf);
   assert(d1==d2);
 
-  fread(&d1, sizeof(d1), 1, pf);
+  my_fread(&d1, sizeof(d1), 1, pf);
 #ifdef STORE_IDS
   for(k = 0, pc = 0; k < 6; k++){
     for(n = 0; n < header.npart[k]; n++){
-      fread(&id, size_int, 1, pf);
+      my_fread(&id, size_int, 1, pf);
       if(k == 1){ /*ONLY KEEP DARK MATTER PARTICLES*/
         Q[*ind+pc].id = id;
         pc++;
@@ -173,7 +174,7 @@ void lee(char *filename, struct particle_data *Q, int *ind){
 #else
   fseek(pf,d1,SEEK_CUR);
 #endif
-  fread(&d2, sizeof(d2), 1, pf);
+  my_fread(&d2, sizeof(d2), 1, pf);
   assert(d1==d2);
 
   *ind += pc;
@@ -230,12 +231,12 @@ void select_particles(void){
   fprintf(stdout,"Selecting particles within a subbox\n"); fflush(stdout);
   
   for(j = 0, i = 0; i < cp.npart; i++){
-    if((P[i].Pos[0] - box.cen[0]) >  cp.lbox/2.0) P[i].Pos[0] -= (type_real)cp.lbox;
-    if((P[i].Pos[0] - box.cen[0]) < -cp.lbox/2.0) P[i].Pos[0] += (type_real)cp.lbox;
-    if((P[i].Pos[1] - box.cen[1]) >  cp.lbox/2.0) P[i].Pos[1] -= (type_real)cp.lbox;
-    if((P[i].Pos[1] - box.cen[1]) < -cp.lbox/2.0) P[i].Pos[1] += (type_real)cp.lbox;
-    if((P[i].Pos[2] - box.cen[2]) >  cp.lbox/2.0) P[i].Pos[2] -= (type_real)cp.lbox;
-    if((P[i].Pos[2] - box.cen[2]) < -cp.lbox/2.0) P[i].Pos[2] += (type_real)cp.lbox;
+    if((P[i].Pos[0] - box.cen[0]) >  cp.lbox/2.0) P[i].Pos[0] -= (my_real)cp.lbox;
+    if((P[i].Pos[0] - box.cen[0]) < -cp.lbox/2.0) P[i].Pos[0] += (my_real)cp.lbox;
+    if((P[i].Pos[1] - box.cen[1]) >  cp.lbox/2.0) P[i].Pos[1] -= (my_real)cp.lbox;
+    if((P[i].Pos[1] - box.cen[1]) < -cp.lbox/2.0) P[i].Pos[1] += (my_real)cp.lbox;
+    if((P[i].Pos[2] - box.cen[2]) >  cp.lbox/2.0) P[i].Pos[2] -= (my_real)cp.lbox;
+    if((P[i].Pos[2] - box.cen[2]) < -cp.lbox/2.0) P[i].Pos[2] += (my_real)cp.lbox;
 
     ///////////////////////////////////////////////////
     if(P[i].Pos[0] < (box.cen[0]-(box.lado+box.franja)) || 

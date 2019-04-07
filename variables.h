@@ -15,19 +15,18 @@
 #define NPARTMIN 20
 #endif
 
-
 /* Precision del codigo (reales) */
 #ifdef PRECDOUBLE
-typedef double type_real;
+typedef double my_real;
 #else
-typedef float type_real;
+typedef float my_real;
 #endif
 
 /* Precision del codigo (enteros) */
 #ifdef LONGIDS
-typedef unsigned long long type_int;
+typedef unsigned long my_int;
 #else
-typedef unsigned int type_int;
+typedef unsigned int my_int;
 #endif
 
 size_t size_real;
@@ -35,14 +34,14 @@ size_t size_int;
 
 /* Posiciones, velocidades y energias de las partículas */
 struct particle_data {
-  type_real      Pos[3];
+  my_real Pos[3];
   #ifdef STORE_VELOCITIES
-  type_real      Vel[3];
+  my_real Vel[3];
   #endif
   #ifdef STORE_IDS
-  type_int       id;
+  my_int  id;
   #endif
-  type_int       indx;
+  my_int  indx;
   unsigned int   fof;
   int            llfof;
   #ifdef IDENSUB
@@ -50,7 +49,7 @@ struct particle_data {
   int               llsub;
   #endif
   #ifdef ENERGIES
-  double          Ep, Ec;
+  double  Ep, Ec;
   #endif
   int               gr;
 } *P;
@@ -58,6 +57,8 @@ struct particle_data {
 struct grupos{
   int llirst;
   unsigned int np;
+  my_real pcm[3], vcm[3];
+  my_real sigpos, sigvel; 
 } *fof, *sub;
 
 unsigned int np_in_fof;

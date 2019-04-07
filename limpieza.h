@@ -19,7 +19,7 @@ struct temporary {
 	unsigned int *npgrup;
 	unsigned int *grup;
 	unsigned int *in;
-	type_real **vcm, **pcm;
+	my_real **vcm, **pcm;
 } Temp;
 
 struct elemento {

@@ -6,10 +6,10 @@
 
 
 ### snapshot options #######
-#EXTRAS += -DPERIODIC    #periodic boundary condition
+EXTRAS += -DPERIODIC    #periodic boundary condition
 #EXTRAS += -DPRECDOUBLE   #Pos and vel in double precision
 #EXTRAS += -DLONGIDS            #IDs are long integer
-#EXTRAS += -DPOSFACTOR=1000.0    #Positions in Kpc/h
+EXTRAS += -DPOSFACTOR=1.0    #Positions in Kpc/h
 #EXTRAS += -DVELFACTOR=1.0      #Velocities in km/s
 EXTRAS += -DSTORE_VELOCITIES
 EXTRAS += -DSTORE_IDS
@@ -18,7 +18,7 @@ EXTRAS += -DENERGIES
 ### IDENFOF options #############
 #EXTRAS += -DREADIDENFOF
 #EXTRAS += -DNHALO=1     # set to the number of halo to analyse
-EXTRAS += -Dlimpiamelo  #
+#EXTRAS += -Dlimpiamelo  #
 #EXTRAS += -DCOMPUTE_FOF_PROPERTIES
 
 ## IDENSUB options ##############
@@ -32,8 +32,8 @@ EXTRAS += -DASSIGN_CLOSEST_GROUP
 #DOMPP:=-DompP
 #CC     := $(OMPP) icc $(DOMPP)
 CC     := $(OMPP) gcc $(DOMPP)
-DC     := -DNTHREADS=8
-CFLAGS := -Wall -O3 -fopenmp -g
+DC     := -DNTHREADS=4
+CFLAGS := -Wall -O3 -fopenmp #-g -Wno-unused-variable
 #GSLL   := -L/usr/local/lib/ -lgsl -lgslcblas
 GSLL   := -lgsl -lgslcblas
 LIBS   := -lm
@@ -62,7 +62,6 @@ prop.x: $(OBJS) prop.o propiedades.o
 
 clean:
 	rm -rf $(OBJS)
-	rm -rf mendieta.o
 
 cleanall: clean
 	rm -rf $(EXEC)

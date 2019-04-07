@@ -36,7 +36,7 @@ struct propiedades_st propiedades(struct particle_data *P, struct grupos *g, int
 	int    indx,iepmin;
 	int    i200, ivir;
 	float  drt;
-	type_real  dx[3],dv[3];
+	my_real  dx[3],dv[3];
 	float a,lbox2,Epmin;
 	gsl_vector_float *_dis;
 	gsl_permutation  *_ind;
@@ -92,8 +92,8 @@ struct propiedades_st propiedades(struct particle_data *P, struct grupos *g, int
 
 	for(dim = 0; dim < 3; dim++)
 	{
-		Prop.pcm[dim] /= (type_real)Prop.npart;
-		Prop.vcm[dim] /= (type_real)Prop.npart;
+		Prop.pcm[dim] /= (my_real)Prop.npart;
+		Prop.vcm[dim] /= (my_real)Prop.npart;
   }
 
 	/* Si el halo tiene menos de 1000 particulas calcula la energia
