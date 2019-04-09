@@ -21,9 +21,9 @@ struct NODE{
 void force_treeallocate(int maxnodes);
 void force_treefree(void);
 
-void add_particle_props_to_node(struct NODE *no, struct particle_data *Q, my_int p);
+void add_particle_props_to_node(struct NODE *no, struct particles *Q, my_int p);
 
-int  force_treebuild(my_int np, struct particle_data *Q, float thetamax);
+int  force_treebuild(my_int np, struct particles *Q, float thetamax);
 void force_setupnonrecursive(struct NODE *no);
 void force_treeevaluate_potential(my_real *pos, double *pot);
 

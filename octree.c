@@ -7,6 +7,7 @@
 #include <math.h>
 #include <time.h>
 #include <assert.h>
+#include <stdbool.h>
 
 #include "variables.h"
 #include "cosmoparam.h"
@@ -44,8 +45,8 @@ void force_treefree(void)
 }
 /************************************************************************/
 
-void add_particle_props_to_node(struct NODE *no, struct particle_data *Q, my_int p){
-  my_int i;
+void add_particle_props_to_node(struct NODE *no, struct particles *Q, my_int p){
+  int i;
   for( i = 0 ; i < 3 ; i++)
     no->s[i] += (my_real)cp.Mpart * (Q[p].Pos[i] - no->center[i]);
 
@@ -53,7 +54,7 @@ void add_particle_props_to_node(struct NODE *no, struct particle_data *Q, my_int
 }
 
 /* packs the particles of group 'gr' into into BH-trees */
-int force_treebuild(my_int np, struct particle_data *Q, float thetamax){
+int force_treebuild(my_int np, struct particles *Q, float thetamax){
   my_int i;
   int j;
   int    subp,subi,p,subnode,fak;
@@ -91,14 +92,14 @@ int force_treebuild(my_int np, struct particle_data *Q, float thetamax){
   
   /*inicializa variables*/
   nfree->father = 0;
-  for(i = 0 ; i < 8 ; i++)
-    nfree->suns[i] = 0;
+  for(j = 0 ; j < 8 ; j++)
+    nfree->suns[j] = 0;
   nfree->partind = 0;
 
   nfree->mass = (my_real)cp.Mpart;
 
-  for(i = 0 ; i < 3 ; i++)
-    nfree->s[i] = (my_real)cp.Mpart*(Q[0].Pos[i] - nfree->center[i]);
+  for(j = 0 ; j < 3 ; j++)
+    nfree->s[j] = (my_real)cp.Mpart*(Q[0].Pos[j] - nfree->center[j]);
   
   /*inicializa la variable que apunta al hermano*/
   nfree->sibling = 0;

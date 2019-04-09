@@ -28,6 +28,6 @@ bool PROP_SUB;
 
 void compute_properties(struct grupos *g);
 void propiedades(struct particle_data *P, struct grupos *g, int gid, struct propiedades_st *Prop);
-void forma(char *flag, struct particle_data *Q, struct propiedades_st *Prop);
+void forma(char *flag, struct particles *Q, struct propiedades_st *Prop);
 void write_properties(FILE *pfout, struct propiedades_st *Prop);
 #endif

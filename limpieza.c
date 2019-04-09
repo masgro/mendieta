@@ -10,7 +10,7 @@
 #include "limpieza.h"
 #include "timer.h"
 #include "octree.h"
-#include "bitmask.h"
+
 
 #define EMIN 0.0
 
@@ -37,7 +37,8 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
   /*Recorre cada uno de los grupos identificados en el paso ifrac-1
     limpiando por energia cada uno de sus subgrupos*/
   for(k = 1; k < n_grupos_sub; k++){
-    if(sub[k].np == 0 || sub[k].llirst == -1) continue;
+
+    if(sub[k].np == 0 || sub[k].llirst == GROUND) continue;
 
     /*Para cada grupos identificado en el paso ifrac-1 crea una linked list
      *de particulas sin grupo en el paso ifrac, y una linked list de subgrupos
@@ -54,7 +55,7 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
     j= 0; l1 = 0;
     #endif
     l = sub[k].llirst; 
-    while(l != -1){
+    while(l != GROUND){
 
       #ifdef DEBUG
       assert(P[l].sub == 0);
@@ -68,12 +69,12 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
         curr->next = head_free_particles;
         head_free_particles = curr;
       }
-      else if(!TestBit(test,grupo)) { //Checkear que este subgrupo no este en la lista
+      else if(!test[grupo]) { //Checkear que este subgrupo no este en la lista
 
         #ifdef DEBUG
         assert(Temp.npgrup[grupo] >= NPARTMIN);
         #endif
-        SetBit(test,grupo);
+        test[grupo] = true;
 
         //Agrega este subgrupo a la lista de subgrupos
         curr = (struct elemento *) malloc(sizeof(struct elemento));
@@ -86,8 +87,7 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
         #ifdef DEBUG
         l3 = 0;
         l2 = Temp.head[grupo];
-        while(l2 != -1)
-        {
+        while(l2 != GROUND){
           l1++;
           l2 = Temp.ll[l2];
           l3++;
@@ -96,7 +96,7 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
         #endif
 
         //Checkea si es el grupo mas masivo
-        if(Temp.npgrup[grupo] > Temp.np_massive_one) {
+        if(Temp.npgrup[grupo] > Temp.np_massive_one){
           Temp.np_massive_one = Temp.npgrup[grupo];
           Temp.massive_one = grupo;
         }
@@ -104,6 +104,7 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
 
       #ifdef DEBUG
       j++;
+      assert(j <= sub[k].np);
       #endif
 
       l = P[l].llsub;
@@ -112,7 +113,7 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
     #ifdef DEBUG
     assert(j == sub[k].np);
     assert(Temp.massive_one != 0 || Temp.nsub == 0);
-    assert((l1+n_free_particles) == j);
+    assert((l1 + n_free_particles) == j);
     #endif
 
     /*** Una sola subestructura ***/
@@ -150,7 +151,6 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
     #ifdef DEBUG
     //assert(Temp.npgrup[Temp.massive_one] == Temp.np_massive_one + n_free_particles);
     #endif
-
     Temp.np_massive_one = Temp.npgrup[Temp.massive_one];
 
     /* Limpia subgrupos excepto el mas masivo */
@@ -179,7 +179,7 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
     curr = head_subgroups;
     while(curr){
       i = curr->id;
-      if(Temp.head[i] == -1){
+      if(Temp.head[i] == GROUND){
         assert(Temp.npgrup[i] == 0);
         curr = curr->next;
         continue;
@@ -191,7 +191,7 @@ void make_cleaning(unsigned int ngrupos, unsigned int *contador_subgrupo){
       j = 0;
       #endif
       l = Temp.head[i];
-      while(l != -1){
+      while(l != GROUND){
         P[l].sub = contador;
         l = Temp.ll[l];
         #ifdef DEBUG
@@ -236,7 +236,7 @@ void compute_velocity_position(){
     }
 
     ip = Temp.head[ig];
-    while(ip != -1){
+    while(ip != GROUND){
       for(idim = 0; idim < 3; idim++){
         Temp.vcm[idim][ig] += P[ip].Vel[idim];
         Temp.pcm[idim][ig] += P[ip].Pos[idim];
@@ -369,72 +369,60 @@ void reasigna(void){
 #endif
 
 void limpieza_new(my_int ig, my_int destino){
-  my_int i,j,k,n_unbound,temp,iEpmin;
-  my_int *lista;
+  my_int i,j,k,temp,iEpmin;
   int    dim;
   double pcm[3],vcm[3];
-  double dv[3];
   double E;
-  struct particle_data *Q;
+  struct particles *Q;
+  my_int n_bounded, n_unbounded;
+
   my_int npart = Temp.npgrup[ig];
-  //int destino = Temp.massive_one;
-  my_int *indices;
 
   my_real xmin[3], xmax[3];
-  xmin[0] = 1.E26; xmax[0] = -1.E26;
-  xmin[1] = 1.E26; xmax[1] = -1.E26;
-  xmin[2] = 1.E26; xmax[2] = -1.E26;
+  xmin[0] =  1.E26; xmin[1] =  1.E26; xmin[2] =  1.E26;
+  xmax[0] = -1.E26; xmax[1] = -1.E26; xmax[2] = -1.E26;
 
-  printf("%u %u %u\n",ig,destino,npart);
-
-  Q	= (struct particle_data *) malloc(npart*sizeof(struct particle_data));
+  Q	= (struct particles *) malloc(npart*sizeof(struct particles));
   assert(Q != NULL);
-  indices = (my_int *) malloc(npart*sizeof(my_int));
-  assert(indices != NULL);
 
-  j = 0;
-  k = Temp.head[ig];
-  do{
-    Q[j].Pos[0] = P[k].Pos[0];
-		Q[j].Pos[1] = P[k].Pos[1];
-		Q[j].Pos[2] = P[k].Pos[2];
-    Q[j].Vel[0] = P[k].Vel[0];
-		Q[j].Vel[1] = P[k].Vel[1];
-		Q[j].Vel[2] = P[k].Vel[2];
-    Q[j].gr     = P[k].gr;
-    indices[j]  = k;
-    Q[j].Ep     = 0.0;
-    Q[j].Ec     = 0.0;
+  i = 0;
+  j = Temp.head[ig];
+  while(j != GROUND){
+    Q[i].Pos[0] = P[j].Pos[0];
+		Q[i].Pos[1] = P[j].Pos[1];
+		Q[i].Pos[2] = P[j].Pos[2];
+    Q[i].Vel[0] = P[j].Vel[0];
+		Q[i].Vel[1] = P[j].Vel[1];
+		Q[i].Vel[2] = P[j].Vel[2];
+    Q[i].indx   = j;
+    Q[i].Ep     = 0.0;
+    Q[i].Ec     = 0.0;
 
-    if(Q[j].Pos[0] < xmin[0]) xmin[0] = Q[j].Pos[0];
-    if(Q[j].Pos[0] > xmax[0]) xmax[0] = Q[j].Pos[0];
-    if(Q[j].Pos[1] < xmin[1]) xmin[1] = Q[j].Pos[1];
-    if(Q[j].Pos[1] > xmax[1]) xmax[1] = Q[j].Pos[1];
-    if(Q[j].Pos[2] < xmin[2]) xmin[2] = Q[j].Pos[2];
-    if(Q[j].Pos[2] > xmax[2]) xmax[2] = Q[j].Pos[2];
+    #ifdef DEBUG
+    assert(P[j].gr == ig);
+    #endif
 
-    j++;
-    k = Temp.ll[k];
-  }while(k != Temp.head[ig]);
+    if(Q[i].Pos[0] < xmin[0]) xmin[0] = Q[i].Pos[0];
+    if(Q[i].Pos[0] > xmax[0]) xmax[0] = Q[i].Pos[0];
+    if(Q[i].Pos[1] < xmin[1]) xmin[1] = Q[i].Pos[1];
+    if(Q[i].Pos[1] > xmax[1]) xmax[1] = Q[i].Pos[1];
+    if(Q[i].Pos[2] < xmin[2]) xmin[2] = Q[i].Pos[2];
+    if(Q[i].Pos[2] > xmax[2]) xmax[2] = Q[i].Pos[2];
 
-  #ifdef DEBUG
-  assert(j == npart);
-  #endif
-	for(i = 0; i < npart; i++){
-    Q[i].Pos[0] -= xmin[0];
-    Q[i].Pos[1] -= xmin[1];
-    Q[i].Pos[2] -= xmin[2];
+    i++;
+    j = Temp.ll[j];
   }
 
-  pcm[0] = 0.0;
-  pcm[1] = 0.0;
-  pcm[2] = 0.0;
-  vcm[0] = 0.0;
-  vcm[1] = 0.0;
-  vcm[2] = 0.0;
+  #ifdef DEBUG
+  assert(i == npart);
+  #endif
+
+  pcm[0] = 0.0; pcm[1] = 0.0; pcm[2] = 0.0;
+  vcm[0] = 0.0; vcm[1] = 0.0; vcm[2] = 0.0;
 
 	for(i = 0; i < npart; i++)
     for(dim = 0; dim < 3; dim++){
+      Q[i].Pos[dim] -= xmin[dim];
       pcm[dim] += (double)Q[i].Pos[dim];
       vcm[dim] += (double)Q[i].Vel[dim];
     }
@@ -446,139 +434,101 @@ void limpieza_new(my_int ig, my_int destino){
 
   compute_potential_energy_subgrupo(npart,Q,&iEpmin);
 
+  /* Cambia la posicion del centro de masa a la posicion 
+   * de la particula con menor energia potencial */
   pcm[0] = Q[iEpmin].Pos[0];
   pcm[1] = Q[iEpmin].Pos[1];
   pcm[2] = Q[iEpmin].Pos[2];
 
+  /* Centra el resto de las particulas a la posicion del centro
+   * y a la velocidad del centro */
 	for(i = 0; i < npart; i++)
     for(dim = 0; dim < 3; dim++){
       Q[i].Pos[dim] -= (my_real)pcm[dim];
       Q[i].Vel[dim] -= (my_real)vcm[dim];
     }
 
-  lista = (my_int *) calloc(npart,sizeof(my_int));
-  assert(lista != NULL);
+  compute_cinetical_energy_subgrupo(npart,Q);
 
-  n_unbound = 0;
+  n_unbounded = 0; n_bounded = 0;
 	for(i = 0; i < npart; i++){
-    Q[i].Ec = 0.0;
-    /* Calcula la energia cinetica (velocidades en [km / seg]) */
-    for(dim = 0 ; dim < 3; dim++){
-      dv[dim]  = cp.Hubble_a;
-      dv[dim] *= cp.aexp;
-      dv[dim] *= (double)Q[i].Pos[dim]*0.001;  /* Velocidad de Hubble */
-      dv[dim] += sqrt(cp.aexp)*(double)Q[i].Vel[dim];
-      Q[i].Ec += dv[dim]*dv[dim];
-    }
-    
-    Q[i].Ec *= 0.5;
-    /***********************************************************/
-
+    Q[i].bounded = true;
     /* Calcula Energia Total */
     E = Q[i].Ec + Q[i].Ep;
     /*************************/
-
     if(E > EMIN){
-      lista[n_unbound] = i;
-      n_unbound++;
-    }
+      Q[i].bounded = false;
+      n_unbounded++;
+    } else
+      n_bounded++;
   }
-
-  lista = (my_int *) realloc(lista,n_unbound*sizeof(my_int));
 
   /** Si luego de limpiar el grupo se queda con menos de NPARTMIN
       lo disolvemos totalmente, y todas su particulas se las damos
       al grupo mas masivo **/
-  if((npart - n_unbound) < NPARTMIN){
+  if(n_bounded < NPARTMIN){
     Temp.nsub--;
 
     #ifdef DEBUG
     j = 0;
     #endif
+
     k = Temp.head[ig];
-    do{
+    while(k != GROUND){
       temp = Temp.ll[k];
+
       #ifdef DEBUG
       j++;
       #endif
+
       P[k].gr = destino;
-//      Temp.ll[k] = Temp.head[destino];
-//      Temp.head[destino] = k;
-//      Temp.npgrup[destino]++;
+      Temp.ll[k] = Temp.head[destino];
+      Temp.head[destino] = k;
+      Temp.npgrup[destino]++;
 
       k = temp;
-    }while(k != Temp.head[ig]);
+    }
 
     #ifdef DEBUG
     assert(j == npart);
     #endif
 
     Temp.npgrup[ig] = 0;
-    Temp.head[ig]   = 0;
-  }else if(n_unbound > 0)
-  /** Si se queda con mas de NPARTMIN entonces las no-ligadas
-      se las damos al grupo mas masivo, y luego reconstruimos
-      la linked list para este grupo **/
-  {
-    for(i = 0; i < n_unbound; i++){
-      k = lista[i];
-      k = indices[k];
-      P[k].gr = destino;
-      //Temp.ll[k] = Temp.head[destino];
-      //Temp.head[destino] = k;
-      //Temp.npgrup[destino]++;
-    }
+    Temp.head[ig]   = GROUND;
 
+  } else {
+  
     /***Regenera la linked list para el subgrupo ig******/
-    //Temp.head[ig]  = -1;
+    Temp.head[ig]  = GROUND;
     Temp.npgrup[ig] = 0;
 
-    j = 0;
     for(i = 0; i < npart; i++){
-      if(indices[i] == lista[j]){
-        j++;
-        continue;
+      k = Q[i].indx;
+
+      if(!(Q[i].bounded)){
+        P[k].gr = destino;
+        Temp.ll[k] = Temp.head[destino];
+        Temp.head[destino] = k;
+        Temp.npgrup[destino]++;
+      } else {
+        Temp.ll[k] = Temp.head[ig];
+        Temp.head[ig] = k;
+        Temp.npgrup[ig]++;
       }
-
-      k = indices[i];
-      #ifdef DEBUG
-      assert(P[k].gr == ig);
-      #endif
-      Temp.head[ig] = k;
-      Temp.npgrup[ig]++;
-    }
-
-    j = 0;
-    for(i = 0; i < npart; i++){
-      if(indices[i] == lista[j]){
-        j++;
-        continue;
-      }
-
-      k = indices[i];
-      #ifdef DEBUG
-      assert(P[k].gr == ig);
-      #endif
-
-      Temp.ll[k] = Temp.head[ig];
-      Temp.head[ig] = k;
-      //Temp.npgrup[ig]++;
     }
 
     #ifdef DEBUG
     assert(Temp.npgrup[ig] >= NPARTMIN);
     #endif
-    /****************************************************/
   }
-
   free(Q);
-  free(lista);
 }
 
-void compute_potential_energy_subgrupo(my_int npart, struct particle_data *Q, my_int *iEpmin){
-  my_int i,j,dim,iEpmin_local = -1;
+void compute_potential_energy_subgrupo(my_int npart, struct particles *Q, my_int *iEpmin){
+  my_int i,j,dim;
   float  Theta = 0.45;
   double dx[3],dis,Epmin;
+  int iEpmin_local = -1;
 
 	/* Si el halo tiene menos de 1000 particulas calcula la energia
 	de forma directa (N^2). Si tiene mas de 1000 particulas usa 
@@ -593,7 +543,7 @@ void compute_potential_energy_subgrupo(my_int npart, struct particle_data *Q, my
 	  	Q[i].Ep  = 0.;
 
 	    for(j = 0; j < npart; j++){
-	  	  if(j == i)continue;
+	  	  if(j == i) continue;
 
 	  		for(dim = 0; dim < 3; dim++)
 	  			dx[dim] = (double)Q[i].Pos[dim] - (double)Q[j].Pos[dim];
@@ -642,6 +592,25 @@ void compute_potential_energy_subgrupo(my_int npart, struct particle_data *Q, my
   *iEpmin = iEpmin_local;
 }
 
+void compute_cinetical_energy_subgrupo(my_int npart, struct particles *Q){
+  my_int i;
+  unsigned int dim;
+  double dv[3];
+
+	for(i = 0; i < npart; i++){
+    Q[i].Ec = 0.0;
+    /* Calcula la energia cinetica (velocidades en [km / seg]) */
+    for(dim = 0 ; dim < 3; dim++){
+      dv[dim]  = cp.Hubble_a;
+      dv[dim] *= cp.aexp;
+      dv[dim] *= (double)Q[i].Pos[dim]*0.001;  /* Velocidad de Hubble */
+      dv[dim] += sqrt(cp.aexp)*(double)Q[i].Vel[dim];
+      Q[i].Ec += dv[dim]*dv[dim];
+    }
+    Q[i].Ec *= 0.5;
+  }
+}
+
 #ifdef COMPUTE_EP
 void compute_potential_energy(void){
   int i;
@@ -675,8 +644,7 @@ void only_one_substructure(int k, int contador)
   int j = 0;
   #endif
   l = sub[k].llirst;
-  while(l != -1)
-  {
+  while(l != GROUND){
     #ifdef DEBUG
     j++;
     #endif

@@ -2,20 +2,11 @@
 #include <stdio.h>
 #include <math.h>
 #include <assert.h>
+#include <stdbool.h>
 #include <string.h>
 #include "variables.h"
 #include "grid.h"
 #include "cosmoparam.h"
-
-/*
-i = grid.llirst[igrid];
-while(i != -1)
-{
-  //hace lo que quieras
-
-  i = grid.ll[i];
-}
-*/
 
 void grid_init(void){
   unsigned long nalloc = grid.ngrid*grid.ngrid*grid.ngrid;
@@ -38,7 +29,7 @@ void grid_build(void){
 	unsigned long ibox;
 
   fac = (double)grid.ngrid/(double)cp.lbox ;
-	printf("Building Grid..... Ngrid = %lu\n",(unsigned long)grid.ngrid);
+	printf("Building Grid..... Ngrid = %u\n",(unsigned int)grid.ngrid);
 
   for( i = 0 ; i < grid.nobj ; i++ ){
     ix = (unsigned long)((double)P[i].Pos[0]*fac);

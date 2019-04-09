@@ -13,7 +13,7 @@ my_real pmin[3], pmax[3];
 /*Input and output files*/
 struct SnapST{
   int nfiles;
-  char root[200], name[200]; 
+  char root[50], name[50]; 
 } snap;
 
 struct io_header{

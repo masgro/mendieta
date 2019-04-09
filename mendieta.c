@@ -71,9 +71,6 @@ int main(int argc, char **argv){
  
     iden.r0  = frac;
     iden.r0 *= 0.17071;
-    //iden.r0 *= 0.362460124334297;
-    //iden.r0 *= 0.69336;
-    //iden.r0 *= 0.7937;
     iden.r0 *= cbrt(cp.Mpart*1.0E10/cp.omegam/RHOCRIT)*1000.0;
 
     //if(ifrac == 0){
@@ -98,7 +95,7 @@ int main(int argc, char **argv){
     fprintf(stdout,"Linking length = %f \n",iden.r0);
 
     iden.nobj = cp.npart;
-    
+
     identification();
 
     linkedlist();
@@ -110,29 +107,28 @@ int main(int argc, char **argv){
       sub_groups();
     #endif
 
-    //#ifdef GETPOSITIONS
-    //get_positions(ifrac);
-    //#endif
+    #ifdef GETPOSITIONS
+    get_positions(ifrac);
+    #endif
 
-    //#ifdef GETINDEX
-    //get_index(ifrac);
-    //#endif
+    #ifdef GETINDEX
+    get_index(ifrac);
+    #endif
 
     //free(Temp.grup);
-    //free(Temp.head);
-    //free(Temp.npgrup);
-    //free(Temp.ll);
+    free(Temp.head);
+    free(Temp.npgrup);
+    free(Temp.ll);
   }
 
   /************* TERMINO LA IDENTIFICACION ***************/
-
   #ifndef READIDENFOF
   write_idenfof(fof_file);
   #endif
 
-  //#ifdef IDENSUB
-  //write_idensub(sub_file);
-  //#endif
+  #ifdef IDENSUB
+  write_idensub(sub_file);
+  #endif
 
   //#if defined(COMPUTE_PROPERTIES)
   //PROP_FOF = true;
@@ -145,11 +141,12 @@ int main(int argc, char **argv){
   //#endif
   //#endif
 
-  //free(fof);
-  //#ifdef IDENSUB
-  //free(sub);
-  //#endif
+  free(fof);
+  #ifdef IDENSUB
+  free(sub);
+  #endif
   free(P);
+
   grid_free();
 
   TIMER(end);
@@ -168,11 +165,7 @@ void linkedlist(){
   Temp.npgrup = (my_int *) calloc(iden.ngrupos,sizeof(my_int));
   Temp.ll     = (my_int *) malloc(iden.nobj*sizeof(my_int));
 
-  for(i = 0; i < iden.nobj; i++){
-    g = P[i].gr;
-    Temp.head[g] = i;
-    Temp.npgrup[g]++;
-  }
+  for(g = 0; g < iden.ngrupos; g++) Temp.head[g] = GROUND;
 
   for(i = 0; i < iden.nobj; i++){
     g = P[i].gr;
@@ -181,7 +174,29 @@ void linkedlist(){
     #endif
     Temp.ll[i] = Temp.head[g];
     Temp.head[g] = i;
+    Temp.npgrup[g]++;
   }
+
+  #ifdef DEBUG
+  for(g = 1; g < iden.ngrupos; g++)
+    assert(Temp.npgrup[g] >= NPARTMIN);
+  #endif
+
+  ///i = 1;
+  ///for(g = 1; g < iden.ngrupos; g++){
+  ///  if(Temp.npgrup[g] < NPARTMIN){
+  ///    Temp.npgrup[g] = 0;
+  ///    Temp.head[g] = GROUND;
+  ///    continue;
+  ///  }
+  ///  Temp.head[i] = Temp.head[g];
+  ///  Temp.npgrup[i] = Temp.npgrup[g];
+  ///  i++;
+  ///}
+  ///iden.ngrupos = i;
+
+  ///Temp.head   = (my_int *) realloc(Temp.head,iden.ngrupos*sizeof(my_int));
+  ///Temp.npgrup = (my_int *) realloc(Temp.npgrup,iden.ngrupos*sizeof(my_int));
 
   printf("End LinkedList\n");fflush(stdout);
 }
@@ -200,7 +215,7 @@ void linkedlist_grupos(int *head, unsigned int *npgrupo,
 }
 
 void fof_groups(void){
-  my_int i,j;
+  my_int i;
 
   n_grupos_fof = iden.ngrupos;
 
@@ -208,74 +223,54 @@ void fof_groups(void){
   fof = (struct grupos *) malloc(n_grupos_fof*sizeof(struct grupos));
   assert(fof != NULL);
 
-  for(i = 1, j = 1; i < n_grupos_fof; i++){
-    //if(groups[i].np < NPARTMIN)continue;
-    //fof[j].llirst = groups[i].llirst;
-    //fof[j].np = groups[i].np;
-    if(Temp.npgrup[i] < NPARTMIN)continue;
-    fof[j].llirst = Temp.head[i];
-    fof[j].np = Temp.npgrup[i];
-    j++;
+  for(i = 1; i < n_grupos_fof; i++){
+    fof[i].llirst = Temp.head[i];
+    fof[i].np = Temp.npgrup[i];
   }
-  n_grupos_fof = j;
 
-  fof = (struct grupos *) realloc(fof,n_grupos_fof*sizeof(struct grupos));
-  assert(fof != NULL);
+  #ifdef limpiamelo
+  for(i = 1; i < iden.ngrupos; i++)
+    limpieza_new(i,0);
+  #endif
 
-  //#ifdef IDENSUB
-  //n_grupos_sub = iden.ngrupos;
-  //sub = (struct grupos *) malloc(n_grupos_sub*sizeof(struct grupos));
-  //assert(sub != NULL);
-  //#endif
+  #ifdef IDENSUB
+  n_grupos_sub = n_grupos_fof;
+  sub = (struct grupos *) malloc(n_grupos_sub*sizeof(struct grupos));
+  assert(sub != NULL);
+  #endif
 
-  //Temp.nsub = n_grupos_fof;
-  //#ifdef limpiamelo
-  //for(i = 1; i < iden.ngrupos; i++)
-  //  limpieza_new(i,0);
-  //#endif
+  Temp.nsub = n_grupos_fof;
+  for(i = 0; i < iden.ngrupos; i++){
+    fof[i].llirst = GROUND;
+    fof[i].np     =  0;
+    #ifdef IDENSUB
+    sub[i].llirst = GROUND;
+    sub[i].np     =  0;
+    #endif
+  }
 
-  //for(i = 0; i < iden.ngrupos; i++){
-  //  fof[i].np     =  0;
-  //  #ifdef IDENSUB
-  //  sub[i].np     =  0;
-  //  #endif
-  //}
+  for(i = 0; i < cp.npart; i++){
+    P[i].fof = P[i].gr;
+    P[i].llfof = fof[P[i].gr].llirst;
+    fof[P[i].gr].llirst = i;
+    fof[P[i].gr].np++;
+    #ifdef DEBUG
+    assert(P[i].gr < n_grupos_fof);
+    #endif
 
-  //for(i = 0; i < cp.npart; i++){
-  //  #ifdef DEBUG
-  //  assert(P[i].gr < n_grupos_fof);
-  //  #endif
-  //  fof[P[i].gr].llirst = i;
-  //  fof[P[i].gr].np++;
-
-  //  #ifdef IDENSUB
-  //  P[i].sub = P[i].gr;
-  //  #ifdef DEBUG
-  //  assert(P[i].sub < n_grupos_sub);
-  //  #endif
-  //  sub[P[i].sub].llirst = i;
-  //  sub[P[i].sub].np++;
-  //  #endif
-  // 
-  //  //P[i].fof = P[i].gr;
-  //}
-
-  //for(i = 0; i < cp.npart; i++){
-  //  P[i].llfof = fof[P[i].gr].llirst;
-  //  fof[P[i].gr].llirst = i;
-
-  //  #ifdef IDENSUB
-  //  P[i].sub = P[i].gr;
-  //  P[i].llsub = sub[P[i].sub].llirst;
-  //  sub[P[i].sub].llirst = i;
-  //  #endif
-  //}
+    #ifdef IDENSUB
+    P[i].sub = P[i].gr;
+    P[i].llsub = sub[P[i].sub].llirst;
+    sub[P[i].sub].llirst = i;
+    sub[P[i].sub].np++;
+    #endif
+  }
 }
 
 #ifdef IDENSUB
 void sub_groups(void){
-  unsigned int i, mysub;
-  unsigned int contador_subgrupo;
+  my_int i, mysub;
+  my_int contador_subgrupo;
 
   if(iden.ngrupos != 0)
     make_cleaning(iden.ngrupos,&contador_subgrupo);
@@ -288,7 +283,7 @@ void sub_groups(void){
   assert(sub != NULL);
 
   for(i = 0; i < n_grupos_sub; i++){
-    sub[i].llirst = -1;
+    sub[i].llirst = GROUND;
     sub[i].np = 0;
   }
 

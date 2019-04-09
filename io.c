@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <assert.h>
+#include <stdbool.h>
 #include "variables.h"
 #include "cosmoparam.h"
 #include "leesnap.h"
@@ -235,7 +236,7 @@ void write_idenfof(char *filename){
     int k = 0;
     #endif
     l = fof[ng].llirst;
-    do{
+    while(l != GROUND){
       fwrite(&l,sizeof(my_int),1,pf);
 
       //reasgina grupos fof a la particula l para que los grupos
@@ -246,9 +247,9 @@ void write_idenfof(char *filename){
       k++;
       #endif
 
-      //l = P[l].llfof;
-      l = Temp.ll[l];
-    }while(l != fof[ng].llirst);
+      l = P[l].llfof;
+      //l = Temp.ll[l];
+    }
     fwrite(&fof[ng].np,sizeof(unsigned int),1,pf);
     #ifdef DEBUG
     assert(k == fof[ng].np);
@@ -265,8 +266,8 @@ void write_idensub(char *sub_file){
   char filename[200];
   FILE *pfsub, *pffof, *pfascii;
   my_int nobj, ng;
-  my_int i;
-  my_int j, l, count = 0;
+  my_int i,l;
+  int j;
   size_t it;
 
 	gsl_permutation *index;
@@ -317,16 +318,13 @@ void write_idensub(char *sub_file){
     Temp.grup[i] = P[j].fof;
   }
 
-  for(i = 0; i < n_grupos_sub; i++){
-    ng = Temp.grup[i];
-    Temp.head[ng] = i;
-    Temp.npgrup[ng]++;
-  }
+  for(i = 0; i < n_grupos_fof; i++) Temp.head[i] = GROUND;
 
   for(i = 0; i < n_grupos_sub; i++){
     ng = Temp.grup[i];
     Temp.ll[i] = Temp.head[ng];
     Temp.head[ng] = i;
+    Temp.npgrup[ng]++;
   }
 
   for(i = 1; i < n_grupos_fof; i++){
@@ -338,14 +336,17 @@ void write_idensub(char *sub_file){
     index = gsl_permutation_alloc(Temp.npgrup[i]);
 
     l = Temp.head[i]; j = 0;
-    do{
+    while(l != GROUND){
+      #ifdef DEBUG
+      assert(j < Temp.npgrup[i]);
+      #endif
       gsl_vector_long_set(group,j,sub[l].np);
       Temp.in[j] = l;
 
-      l = Temp.ll[l];
-
       j++;
-    }while(l != Temp.head[i]);
+
+      l = Temp.ll[l];
+    }
 
     #ifdef DEBUG
     assert(j == Temp.npgrup[i]);
@@ -354,7 +355,6 @@ void write_idensub(char *sub_file){
     gsl_sort_vector_long_index(index,group);
 
     for(j = Temp.npgrup[i] - 1; j >= 0; j--){
-      count++;
       it = gsl_permutation_get(index,j);
       ng = Temp.in[it];
 
@@ -369,7 +369,7 @@ void write_idensub(char *sub_file){
       int k = 0;
       #endif
       l = sub[ng].llirst;
-      do{
+      while(l != GROUND){
         #ifdef READIDENFOF
         fwrite(&P[l].indx,sizeof(int),1,pfsub);
         #else
@@ -379,7 +379,7 @@ void write_idensub(char *sub_file){
         #ifdef DEBUG
         k++;
         #endif
-      }while(l != sub[ng].llirst);
+      }
       fwrite(&sub[ng].np,sizeof(unsigned int),1,pfsub);
       
       #ifdef DEBUG
@@ -412,10 +412,10 @@ void get_positions(int ifrac){
   pfout = fopen(filename,"w");
   for(i = 0; i < n_grupos_sub; i++){
     l = sub[i].llirst;
-    do{
+    while(l != GROUND){
       fprintf(pfout,"%f %f %f %d\n",P[l].Pos[0],P[l].Pos[1],P[l].Pos[2],i);
       l = P[l].llsub;
-    }while(l != sub[i].llirst);
+    }
   }
   fclose(pfout);
 }
@@ -430,10 +430,10 @@ void get_index(int ifrac){
   pfout = fopen(filename,"w");
   for(i = 0; i < n_grupos_fof; i++){
     l = fof[i].llirst;
-    do{
+    while(l != GROUND){
       fprintf(pfout,"%d %d\n",l,i);
       l = P[l].llfof;
-    }while(l != fof[i].llirst);
+    }
   }
   fclose(pfout);
 }

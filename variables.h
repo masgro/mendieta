@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 #ifndef VARIABLES_H
 #define VARIABLES_H
 
@@ -12,7 +14,7 @@
 #define KERNEL_TABLE 10000
 
 #ifndef NPARTMIN
-#define NPARTMIN 10
+#define NPARTMIN 20
 #endif
 
 /* Precision del codigo (reales) */
@@ -25,8 +27,10 @@ typedef float my_real;
 /* Precision del codigo (enteros) */
 #ifdef LONGIDS
 typedef unsigned long my_int;
+#define GROUND UINT64_MAX
 #else
 typedef unsigned int my_int;
+#define GROUND UINT32_MAX
 #endif
 
 size_t size_real;
@@ -42,9 +46,7 @@ struct particle_data {
   my_int  id;
   #endif
   //my_int  indx;
-  #ifdef READIDENFOF
   my_int  fof;
-  #endif
   my_int  llfof;
   #ifdef IDENSUB
   my_int  sub;
@@ -55,6 +57,15 @@ struct particle_data {
   #endif
   my_int  gr;
 } *P;
+
+struct particles{
+  my_real Pos[3];
+  my_real Vel[3];
+  my_int  indx;
+  double  Ep, Ec;
+  bool bounded;
+};
+
 
 struct grupos{
   my_int llirst;

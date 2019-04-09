@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <assert.h>
+#include <stdbool.h>
 #include "variables.h"
 #include "cosmoparam.h"
 #include "leesnap.h"

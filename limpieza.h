@@ -33,7 +33,8 @@ void free_memory(void);
 void reasigna(void);
 void reasigna_closest(void);
 void limpieza_new(my_int ig, my_int destino);
-void compute_potential_energy_subgrupo(my_int npart,struct particle_data *Q, my_int *iEpmin);
+void compute_potential_energy_subgrupo(my_int npart,struct particles *Q, my_int *iEpmin);
+void compute_cinetical_energy_subgrupo(my_int, struct particles *);
 void compute_potential_energy(void);
 void only_one_substructure(int k, int contador);
 #endif
