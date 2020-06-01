@@ -10,7 +10,7 @@
 #include <stdbool.h>
 
 #include "variables.h"
-#include "cosmoparam.h"
+#include "propiedades.h"
 #include "octree.h"
 
 #define KERNEL_LENGTH   10000
@@ -22,61 +22,105 @@ static struct NODE *last;
 static int    numnodestotal;        /* total number of nodes */
 static int    MaxNodes;
 
-static my_real xmin[3],xmax[3];
+static type_real xmin[3],xmax[3];
 
-static my_int  N;
+static type_int  N;
 
 static float   knlrad  [KERNEL_LENGTH+1],
                knlpot  [KERNEL_LENGTH+1];
 
 /*************************************************************************/
-/***ALLOCATACION Y FREE***/
-void force_treeallocate(int maxnodes) 
+
+static void force_setkernel(void)
 {
-  MaxNodes = maxnodes;
-  nodes = (struct NODE *) malloc(MaxNodes*sizeof(struct NODE));
-  assert(nodes!=NULL);
-  force_setkernel();
+  int i;
+  double u;
+  double u2;
+  double u3;
+  double u4;
+  double u5;
+
+  for(i = 0; i <= KERNEL_LENGTH; i++){
+    u = (double)i/(double)KERNEL_LENGTH;
+
+    knlrad[i] = u;
+
+    if(u <= 0.5){
+      u2 = u*u;
+      u4 = u2*u2;
+      u5 = u4*u;
+      knlpot[i]  = 16.0/3.0*u2;
+      knlpot[i] -= 48.0/5.0*u4;
+      knlpot[i] += 32.0/5.0*u5;
+      knlpot[i] -= 14.0/5.0;
+    }else{
+      u2 = u*u;
+      u3 = u2*u;
+      u4 = u2*u2;
+      u5 = u4*u;
+      knlpot[i]  = 1.0/15.0/u;
+      knlpot[i] += 32.0/3.0*u2;
+      knlpot[i] -= 16.0*u3;
+      knlpot[i] += 48.0/5.0*u4;
+      knlpot[i] -= 32.0/15.0*u5;
+      knlpot[i] -= 16.0/5.0;
+    }
+  }
 }
 
-void force_treefree(void)
+static void add_particle_props_to_node(struct NODE *no, type_real *pos, type_int p)
 {
-  free(nodes);
-}
-/************************************************************************/
-
-void add_particle_props_to_node(struct NODE *no, struct particles *Q, my_int p){
   int i;
   for( i = 0 ; i < 3 ; i++)
-    no->s[i] += (my_real)cp.Mpart * (Q[p].Pos[i] - no->center[i]);
+    no->s[i] += (type_real)cp.Mpart * (pos[3*p+i] - no->center[i]);
 
-  no->mass += (my_real)cp.Mpart;
+  no->mass += (type_real)cp.Mpart;
 }
 
+static void force_setupnonrecursive(struct NODE *no)
+{
+  int i;
+  struct NODE *nn;
+  
+  if(last)
+    last->next = no;
+
+  last = no;
+  
+  for(i = 0; i < 8; i++){
+    nn = no->suns[i];
+    if(nn != NULL)
+      force_setupnonrecursive(nn);
+  }
+}
+
+/****************************************/
+
 /* packs the particles of group 'gr' into into BH-trees */
-int force_treebuild(my_int np, struct particles *Q, float thetamax){
-  my_int i;
+extern int force_treebuild(struct propiedades_st *Prop, float thetamax)
+{
+  type_int i;
   int j;
   int    subp,subi,p,subnode,fak;
-  my_real  length;
-  my_real  dx,dy,dz;
+  type_real  length;
+  type_real  dx,dy,dz;
   struct NODE *nfree,*th,*nn,*ff;
 
-  N = np;
+  N = Prop->npart;
 
   nfree = nodes;
   numnodestotal = 0;
 
   for(j = 0 ; j < 3 ; j++)                        /* find enclosing rectangle */
-    xmin[j] = xmax[j] = Q[0].Pos[j];
+    xmin[j] = xmax[j] = Prop->pos[j];
 
   for(i = 0 ; i < N ; i++)
     for(j = 0 ; j < 3 ; j++)
     {
-      if(Q[i].Pos[j] > xmax[j]) 
-        xmax[j] = Q[i].Pos[j];
-      if(Q[i].Pos[j] < xmin[j]) 
-        xmin[j] = Q[i].Pos[j];
+      if(Prop->pos[3*i+j] > xmax[j]) 
+        xmax[j] = Prop->pos[3*i+j];
+      if(Prop->pos[3*i+j] < xmin[j]) 
+        xmin[j] = Prop->pos[3*i+j];
     }
   
   for(j = 1 , length = xmax[0]-xmin[0] ; j < 3 ; j++)  /* determine maxmimum extension */
@@ -96,10 +140,10 @@ int force_treebuild(my_int np, struct particles *Q, float thetamax){
     nfree->suns[j] = 0;
   nfree->partind = 0;
 
-  nfree->mass = (my_real)cp.Mpart;
+  nfree->mass = (type_real)cp.Mpart;
 
   for(j = 0 ; j < 3 ; j++)
-    nfree->s[j] = (my_real)cp.Mpart*(Q[0].Pos[j] - nfree->center[j]);
+    nfree->s[j] = (type_real)cp.Mpart*(Prop->pos[j] - nfree->center[j]);
   
   /*inicializa la variable que apunta al hermano*/
   nfree->sibling = 0;
@@ -120,13 +164,13 @@ int force_treebuild(my_int np, struct particles *Q, float thetamax){
   
     while(1)
     {
-      add_particle_props_to_node(th,Q,i);
+      add_particle_props_to_node(th,Prop->pos,i);
 
       if(th->partind >= 0)
         break;
     
       for(j = 0 , subnode = 0 , fak = 1 ; j < 3 ; j++ , fak <<= 1)
-        if(Q[i].Pos[j] > th->center[j])
+        if(Prop->pos[3*i+j] > th->center[j])
           subnode += fak;
 
       nn = th->suns[subnode];
@@ -143,7 +187,7 @@ int force_treebuild(my_int np, struct particles *Q, float thetamax){
         p = th->partind;
 
         for( j = 0 , subp = 0 , fak = 1 ; j < 3 ; j++ , fak <<= 1)
-          if(Q[p].Pos[j] > th->center[j])
+          if(Prop->pos[3*p+j] > th->center[j])
             subp += fak;
 
         nfree->father = th;
@@ -159,17 +203,17 @@ int force_treebuild(my_int np, struct particles *Q, float thetamax){
           nfree->center[j] = th->center[j];
 
         for(j = 0 ; j < 3 ; j++)
-          if(Q[p].Pos[j] > nfree->center[j])
+          if(Prop->pos[3*p+j] > nfree->center[j])
             nfree->center[j] += nfree->len/2;
           else
             nfree->center[j] -= nfree->len/2;
 
         nfree->partind = p;
 
-        nfree->mass = (my_real)cp.Mpart;
+        nfree->mass = (type_real)cp.Mpart;
 
         for(j = 0 ; j < 3 ; j++)
-          nfree->s[j] = (my_real)cp.Mpart*(Q[p].Pos[j] - nfree->center[j]);
+          nfree->s[j] = (type_real)cp.Mpart*(Prop->pos[3*p+j] - nfree->center[j]);
         
         th->partind = -1;
         th->suns[subp] = nfree;
@@ -184,13 +228,13 @@ int force_treebuild(my_int np, struct particles *Q, float thetamax){
         }
 
         for(j = 0 , subi = 0 , fak = 1 ; j < 3 ; j++ , fak <<= 1)
-          if(Q[i].Pos[j] > th->center[j])
+          if(Prop->pos[3*i+j] > th->center[j])
             subi += fak;
 
         if(subi == subp)   /* the new particle lies in the same sub-cube */
         {
           th = nfree-1;
-          add_particle_props_to_node(th,Q,i);      
+          add_particle_props_to_node(th,Prop->pos,i);
         }
         else
           break;
@@ -198,7 +242,7 @@ int force_treebuild(my_int np, struct particles *Q, float thetamax){
     }
       
     for(j = 0 , subi = 0 , fak = 1 ; j < 3 ; j++ , fak <<= 1)
-      if(Q[i].Pos[j] > th->center[j])
+      if(Prop->pos[3*i+j] > th->center[j])
         subi += fak;
       
     nfree->father = th;
@@ -214,15 +258,15 @@ int force_treebuild(my_int np, struct particles *Q, float thetamax){
       nfree->center[j] = th->center[j];
 
     for(j = 0 ; j < 3 ; j++)
-      if(Q[i].Pos[j] > nfree->center[j])
+      if(Prop->pos[3*i+j] > nfree->center[j])
         nfree->center[j] += nfree->len/2;
       else
         nfree->center[j] -= nfree->len/2;
 
-    nfree->mass = (my_real)cp.Mpart;
+    nfree->mass = (type_real)cp.Mpart;
 
     for(j = 0 ; j < 3 ; j++)
-      nfree->s[j] = (my_real)cp.Mpart*(Q[i].Pos[j] - nfree->center[j]);
+      nfree->s[j] = (type_real)cp.Mpart*(Prop->pos[3*i+j] - nfree->center[j]);
 
     nfree->partind = i;
     th->suns[subi] = nfree;
@@ -251,7 +295,7 @@ int force_treebuild(my_int np, struct particles *Q, float thetamax){
       dy = th->s[1];
       dz = th->s[2];
     
-      th->oc  = (my_real)sqrt(dx*dx + dy*dy + dz*dz);
+      th->oc  = (type_real)sqrt(dx*dx + dy*dy + dz*dz);
       th->oc += th->len/(thetamax); 
       th->oc *= th->oc;     /* used in cell-opening criterion */
     }
@@ -290,38 +334,21 @@ int force_treebuild(my_int np, struct particles *Q, float thetamax){
   
       th->sibling = nn;
     }
+
   return numnodestotal;
 }
 
-
-void force_setupnonrecursive(struct NODE *no)
-{
-  int i;
-  struct NODE *nn;
-  
-  if(last)
-    last->next = no;
-
-  last = no;
-  
-  for(i = 0; i < 8; i++){
-    nn = no->suns[i];
-    if(nn != NULL)
-      force_setupnonrecursive(nn);
-  }
-}
-
-
 /****************************************************************/
-void force_treeevaluate_potential(my_real *pos, double *pot){
+extern type_real force_treeevaluate_potential(const type_real pos [])
+{
   struct NODE *no;
-  my_real r2,dx,dy,dz,r,u,h,ff;
-  my_real wp;
-  my_real h_inv;
-  my_real local_pot;
+  type_real r2,dx,dy,dz,r,u,h,ff;
+  type_real wp;
+  type_real h_inv;
+  type_real local_pot;
   int ii;
 
-  h = 2.8*(my_real)cp.soft;
+  h = 2.8*(type_real)cp.soft;
   h_inv = 1.0 / h;
 
   local_pot = 0.;
@@ -338,7 +365,7 @@ void force_treeevaluate_potential(my_real *pos, double *pot){
     r2 = dx*dx + dy*dy + dz*dz;
 
     if(no->partind >= 0){   /* single particle */
-      r = (my_real)sqrt(r2);  
+      r = (type_real)sqrt(r2);  
      
       u = r * h_inv;
 
@@ -357,7 +384,7 @@ void force_treeevaluate_potential(my_real *pos, double *pot){
       if(r2 < no->oc){
         no = no->next;  /* open cell */
       }else{
-        r = (my_real)sqrt(r2);  
+        r = (type_real)sqrt(r2);  
         u = r*h_inv;
     
         if(u >= 1){  /* ordinary quadrupol moment */
@@ -375,43 +402,22 @@ void force_treeevaluate_potential(my_real *pos, double *pot){
     }
   }
 
-  *pot = local_pot;
+  return local_pot;
 }
 
-
-/****************************************/
-void force_setkernel(void){
-  int i;
-  double u;
-  double u2;
-  double u3;
-  double u4;
-  double u5;
-
-  for(i = 0; i <= KERNEL_LENGTH; i++){
-    u = (double)i/(double)KERNEL_LENGTH;
-
-    knlrad[i] = u;
-
-    if(u <= 0.5){
-      u2 = u*u;
-      u4 = u2*u2;
-      u5 = u4*u;
-      knlpot[i]  = 16.0/3.0*u2;
-      knlpot[i] -= 48.0/5.0*u4;
-      knlpot[i] += 32.0/5.0*u5;
-      knlpot[i] -= 14.0/5.0;
-    }else{
-      u2 = u*u;
-      u3 = u2*u;
-      u4 = u2*u2;
-      u5 = u4*u;
-      knlpot[i]  = 1.0/15.0/u;
-      knlpot[i] += 32.0/3.0*u2;
-      knlpot[i] -= 16.0*u3;
-      knlpot[i] += 48.0/5.0*u4;
-      knlpot[i] -= 32.0/15.0*u5;
-      knlpot[i] -= 16.0/5.0;
-    }
-  }
+/***ALLOCATACION Y FREE***/
+extern void force_treeallocate(int maxnodes) 
+{
+  MaxNodes = maxnodes;
+  nodes = (struct NODE *) malloc(MaxNodes*sizeof(struct NODE));
+  assert(nodes!=NULL);
+  force_setkernel();
 }
+
+extern void force_treefree(void)
+{
+  free(nodes);
+}
+/************************************************************************/
+
+

@@ -2,356 +2,550 @@
 #include <stdio.h>
 #include <assert.h>
 #include <math.h>
-#include <stdbool.h>
 #include <omp.h>
-#include <string.h>
 
+#include "propiedades.h"
 #include "variables.h"
-#include "cosmoparam.h"
+#include "leesnap.h"
 #include "grid.h"
 #include "iden.h"
-#include "bitmask.h"
+#include "io.h"
 
-#define MY_DIM 0
+#define DIV_CEIL(x,y) (x+y-1)/y
 
-struct global_head_st{
-  item *head;
-  struct global_head_st *global_next;
-};
+static struct iden_st iden;
+static struct temporary Temp;
+static type_int **gr;
+#ifdef LOCK
+  static omp_lock_t *lock;
+#endif
+ 
+static inline type_int Raiz(type_int i, type_int * restrict ar)
+{
+  if(i != ar[i])
+    ar[i] = Raiz(ar[i],ar);
+ 
+  return ar[i];
+}
 
-void identification(void){
-  unsigned int nvec;
-  int  nthreads, tid;
-  my_int i,j,ngrupo;
-  item *tmp,*tmp1;
-  item *curr,*head;
-  int *test;
-  my_real zcm;
-  my_int nn;
-  my_int *grupos_per_thread,ntotal;
-  void *puntero;
-  struct global_head_st **global_head;
-  struct global_head_st *curr_global_head;
+static inline void Unir(type_int u, type_int v, type_int * restrict ar)
+{
+ 
+  type_int z;
 
-  unsigned long ngrid_old = grid.ngrid;
-  grid.ngrid = (int)(cp.lbox/iden.r0);
+  while(ar[u] != ar[v])
+  { 
+      if(ar[u] < ar[v])
+      {
+#ifdef LOCK
+          if(u == ar[u])
+          {
+            omp_set_lock(&(lock[u]));
+            z = 0;
+
+            if(u == ar[u])
+            {
+              ar[u] = ar[v];  
+              z = 1;
+            } 
+
+            omp_unset_lock(&(lock[u]));
+            if(z==1) break;             
+
+          }
+#else
+          if(u == ar[u])
+          {
+            ar[u] = ar[v];  
+            break;             
+          }
+#endif
+          
+          z = ar[u];   
+          ar[u] = ar[v];
+          u = z;
+
+      }else{
+#ifdef LOCK
+          if(v == ar[v])
+          {
+            omp_set_lock(&(lock[v]));
+            z = 0;
+
+            if(v == ar[v])
+            {
+              ar[v] = ar[u];   
+              z = 1;
+            }
+
+            omp_unset_lock(&(lock[v]));
+            if(z == 1) break;            
+          }
+#else
+          if(v == ar[v])
+          {
+            ar[v] = ar[u];   
+            break;             
+          }
+#endif
+
+          z = ar[v];   
+          ar[v] = ar[u];   
+          v = z;
+
+      }
+  }
+
+}
+
+static void busv(const type_int ic)
+{
+
+  long ixc, iyc, izc, ibox;
+  type_int i, niv;
+  type_real xx, yy, zz;
+
+#ifdef COLUMN
+
+  ixc  = (long)(P.x[ic]*(type_real)grid.ngrid*(1.f/cp.lbox));
+  iyc  = (long)(P.y[ic]*(type_real)grid.ngrid*(1.f/cp.lbox));
+  izc  = (long)(P.z[ic]*(type_real)grid.ngrid*(1.f/cp.lbox));
+
+#else
+
+  ixc  = (long)(P[ic].pos[0]*(type_real)grid.ngrid*(1.f/cp.lbox));
+  iyc  = (long)(P[ic].pos[1]*(type_real)grid.ngrid*(1.f/cp.lbox));
+  izc  = (long)(P[ic].pos[2]*(type_real)grid.ngrid*(1.f/cp.lbox));
+
+#endif
+
+  #ifndef PERIODIC
+    for(long ixx = ((ixc-1<0) ? 0 : ixc-1); ixx <= ((ixc+1 >= grid.ngrid) ? grid.ngrid-1 : ixc+1); ixx++)
+  #else
+    for(long ixx = ixc-1; ixx <= ixc+1; ixx++)
+  #endif
+  {
+    #ifndef PERIODIC
+      for(long iyy = ((iyc-1<0) ? 0 : iyc-1); iyy <= ((iyc+1 >= grid.ngrid) ? grid.ngrid-1 : iyc+1); iyy++)
+    #else
+      for(long iyy = iyc-1 ; iyy <= iyc+1 ; iyy++)
+    #endif
+    {
+      #ifndef PERIODIC
+        for(long izz = ((izc-1<0) ? 0 : izc-1); izz <= ((izc+1 >= grid.ngrid) ? grid.ngrid-1 : izc+1); izz++)
+      #else
+        for(long izz = izc-1 ; izz <= izc+1 ; izz++)
+      #endif
+      {
+
+      	#ifdef PERIODIC
+          ibox = igrid(( (ixx >= (long)grid.ngrid) ? ixx-(long)grid.ngrid : ( (ixx<0) ? ixx + (long)grid.ngrid : ixx ) ),\
+                       ( (iyy >= (long)grid.ngrid) ? iyy-(long)grid.ngrid : ( (iyy<0) ? iyy + (long)grid.ngrid : iyy ) ),\
+                       ( (izz >= (long)grid.ngrid) ? izz-(long)grid.ngrid : ( (izz<0) ? izz + (long)grid.ngrid : izz ) ),\
+                       (long)grid.ngrid);
+        #else
+          ibox = igrid(ixx,iyy,izz,(long)grid.ngrid);
+        #endif
+
+        for(i=grid.icell[ibox];i<grid.icell[ibox+1];i++)
+        {
+          if(ic<i)
+          {
+
+#ifdef COLUMN           
+            xx = P.x[i] - P.x[ic];
+            yy = P.y[i] - P.y[ic];
+            zz = P.z[i] - P.z[ic];
+#else
+            xx = P[i].pos[0] - P[ic].pos[0];
+            yy = P[i].pos[1] - P[ic].pos[1];
+            zz = P[i].pos[2] - P[ic].pos[2];
+#endif
+            #ifdef PERIODIC
+            xx = ( xx >  cp.lbox*0.5f ) ? xx - cp.lbox : xx ;
+            yy = ( yy >  cp.lbox*0.5f ) ? yy - cp.lbox : yy ;
+            zz = ( zz >  cp.lbox*0.5f ) ? zz - cp.lbox : zz ;
+            xx = ( xx < -cp.lbox*0.5f ) ? xx + cp.lbox : xx ;
+            yy = ( yy < -cp.lbox*0.5f ) ? yy + cp.lbox : yy ;
+            zz = ( zz < -cp.lbox*0.5f ) ? zz + cp.lbox : zz ;
+            #endif
+
+            for(niv=0;niv<nfrac;niv++)
+            {
+      	      if(xx*xx + yy*yy + zz*zz < iden.r0[niv])
+              {
+                Unir(ic,i,gr[niv]);
+              }
+            }
+      	  } // cierra el if
+
+        } /*fin lazo particulas del grid*/
+      } /*fin izz*/
+    } /*fin iyy*/
+  } /*fin ixx*/
+
+}
+
+static void linkedlist(type_int * restrict ar)
+{
+  type_int i, g;
+
+  Temp.ll = (type_int *) calloc(iden.nobj,sizeof(type_int));
+
+  iden.ngrupos = 0;
+  for(i=0;i<iden.nobj;i++)
+  {
+    ar[i] = Raiz(i,ar);
+    assert(ar[i]>=i);
+    if(Temp.ll[ar[i]] < NPARTMIN)
+    {
+      Temp.ll[ar[i]]++;
+      if(Temp.ll[ar[i]]==NPARTMIN)
+      { 
+        iden.ngrupos++;
+        Temp.ll[ar[i]] = NPARTMIN + iden.ngrupos;
+      }
+    }
+  }
+
+  iden.ngrupos++;  // SUMA UNO;
+
+  Temp.head   = (type_int *) malloc(iden.ngrupos*sizeof(type_int));
+  Temp.npgrup = (type_int *) malloc(iden.ngrupos*sizeof(type_int));
+
+  for(i=0;i<iden.ngrupos;i++)
+  {
+    Temp.head[i]   = iden.nobj;
+    Temp.npgrup[i] =  0;
+  }
+
+  for(i=0;i<iden.nobj;i++)
+  {
+    if(Temp.ll[ar[i]]>NPARTMIN)
+    {
+      ar[i] = Temp.ll[ar[i]] - NPARTMIN;
+    }else{
+      ar[i] = 0;
+    }
+
+    g = ar[i];
+
+    #ifdef DEBUG
+    assert((g >= 0) && (g < iden.ngrupos));
+    #endif
+    Temp.ll[i] = Temp.head[g];
+    Temp.head[g] = i;
+    Temp.npgrup[g]++;
+  }
+
+  return;
+}
+
+static void Write_Groups(type_int niv)
+{
+  type_int i,j,k,dim,npar,gn,save_sub;
+  type_real dx[3];
+  char filename[200];
+  FILE *pfout, *pfcentros;
+  #ifdef FILE_ASCII
+    FILE *pfcentros_ascii;
+  #endif
+  struct propiedades_st Prop;
+
+  i = iden.ngrupos-1; // LE RESTO UNO POR EL GRUPO 0 PARA ESCRIBIR EN EL ARCHIVO
+
+  ///////////////////////////////////////////////////////
+  sprintf(filename,"%.2d_%.2f_fof.bin",snap.num,fof[niv]);
+  pfout=fopen(filename,"w");
+  fwrite(&i,sizeof(type_int),1,pfout);
+  //////////////////////////////////////////////////////
+  sprintf(filename,"%.2d_%.2f_centros.bin",snap.num,fof[niv]);
+  pfcentros=fopen(filename,"w");
+  fwrite(&i,sizeof(type_int),1,pfcentros);
+  //////////////////////////////////////////////////////
+  #ifdef FILE_ASCII
+    sprintf(filename,"%.2d_%.2f_centros.dat",snap.num,fof[niv]);
+    pfcentros_ascii=fopen(filename,"w");
+  #endif  
+  //////////////////////////////////////////////////////
+
+  npar = gn = 0;
+
+  for(i=1;i<iden.ngrupos;i++)
+  {
+
+    j = 0;
+    k = Temp.head[i];
+
+    if(niv==0)
+      save_sub = i;
+    else
+      save_sub = gr[niv-1][Temp.head[i]];
+
+    fwrite(&save_sub,sizeof(type_int),1,pfout);
+    fwrite(&i,sizeof(type_int),1,pfout);
+    fwrite(&Temp.npgrup[i],sizeof(type_int),1,pfout);    
+
+    Prop.npart = Temp.npgrup[i];
+    for(dim = 0; dim < 3; dim++)
+	  {
+		  Prop.pcm[dim] = 0.;
+#ifdef STORE_VELOCITIES        
+		  Prop.vcm[dim] = 0.;
+		  Prop.L[dim]   = 0.;
+		  Prop.sig[dim] = 0.;
+#endif
+	  }
+    Prop.pos = (type_real *) malloc(3*Prop.npart*sizeof(type_real));
+#ifdef STORE_VELOCITIES        
+    Prop.vel = (type_real *) malloc(3*Prop.npart*sizeof(type_real));
+#endif
+
+    while(k != iden.nobj)
+    {
+
+      // cuidado con el orden {pos[i]-centro} en este caso
+#ifdef COLUMN
+      Prop.pos[3*j+0] = P.x[k];
+      Prop.pos[3*j+1] = P.y[k];
+      Prop.pos[3*j+2] = P.z[k];
+#ifdef STORE_VELOCITIES        
+      Prop.vel[3*j+0] = P.vx[k];
+      Prop.vel[3*j+1] = P.vy[k];
+      Prop.vel[3*j+2] = P.vz[k];
+#endif
+
+      dx[0] = P.x[k] - P.x[Temp.head[i]];
+      dx[1] = P.y[k] - P.y[Temp.head[i]];
+      dx[2] = P.z[k] - P.z[Temp.head[i]];
+#else
+      Prop.pos[3*j+0] = P[k].pos[0];
+      Prop.pos[3*j+1] = P[k].pos[1];
+      Prop.pos[3*j+2] = P[k].pos[2];
+#ifdef STORE_VELOCITIES        
+      Prop.vel[3*j+0] = P[k].vel[0];
+      Prop.vel[3*j+1] = P[k].vel[1];
+      Prop.vel[3*j+2] = P[k].vel[2];
+#endif
+
+      dx[0] = P[k].pos[0] - P[Temp.head[i]].pos[0];
+      dx[1] = P[k].pos[1] - P[Temp.head[i]].pos[1];
+      dx[2] = P[k].pos[2] - P[Temp.head[i]].pos[2];
+#endif
+
+      for(dim=0; dim<3; dim++)
+      {
+        #ifdef PERIODIC
+        if(dx[dim] >  cp.lbox*0.5)
+        {
+          dx[dim] -= cp.lbox;
+          Prop.pos[3*j+dim] -= cp.lbox;
+        }
+
+        if(dx[dim] < -cp.lbox*0.5)
+        {
+          dx[dim] += cp.lbox;
+          Prop.pos[3*j+dim] += cp.lbox;
+        }
+        #endif
+
+        Prop.pcm[dim] += dx[dim];
+#ifdef STORE_VELOCITIES        
+        Prop.vcm[dim] += Prop.vel[3*j + dim];
+#endif
+      }
+
+#ifdef COLUMN
+      fwrite(&P.id[k],sizeof(type_int),1,pfout);
+#else
+      fwrite(&P[k].id,sizeof(type_int),1,pfout);
+#endif
+      k = Temp.ll[k];
+      j++;
+    }
+    
+    assert(j == Temp.npgrup[i]);
+
+    for(dim = 0; dim < 3; dim++)
+	  {
+	  	Prop.pcm[dim] /= (type_real)Prop.npart;
+#ifdef STORE_VELOCITIES        
+	  	Prop.vcm[dim] /= (type_real)Prop.npart;
+#endif
+
+      //	Recenter	
+      Prop.pcm[dim] += Prop.pos[dim];
+
+#ifdef CHANGE_POSITION
+      Prop.pcm[idim] += pmin[idim];
+#endif
+
+#ifdef PERIODIC
+      Prop.pcm[dim] = Prop.pcm[dim]<0.0f     ? cp.lbox+Prop.pcm[dim] : Prop.pcm[dim];
+      Prop.pcm[dim] = Prop.pcm[dim]>=cp.lbox ? Prop.pcm[dim]-cp.lbox : Prop.pcm[dim];
+#endif
+
+    }
+
+    propiedades(&Prop);
+
+    fwrite(&save_sub,sizeof(type_int),1,pfcentros);
+    fwrite(&i,sizeof(type_int),1,pfcentros);
+    write_properties(pfcentros, Prop);
+
+    #ifdef FILE_ASCII
+      fprintf(pfcentros_ascii,"%u %u ",save_sub,i);
+      write_properties_ascii(pfcentros_ascii, Prop);
+    #endif
+     
+    free(Prop.pos);
+#ifdef STORE_VELOCITIES        
+    free(Prop.vel);
+#endif
+
+    npar+=j;
+    gn++;
+  }
+
+  assert(gn == (iden.ngrupos-1));
+  fclose(pfout);
+  fclose(pfcentros);
+  #ifdef FILE_ASCII
+    fclose(pfcentros_ascii);
+  #endif
+
+  fprintf(stdout,"num de grupos %u num de particulas en grupos %u\n",gn,npar);
+  fflush(stdout);
+
+  return;
+}
+
+extern void identification(void)
+{
+  type_int i, j, tid;
+  type_int ngrid_old;
+
+  grid.ngrid = 0;
+
+  ngrid_old = grid.ngrid;
+  iden.nobj = cp.npart;
+  iden.r0 = (double *) malloc(nfrac*sizeof(double));
+  gr      = (unsigned int **) malloc(nfrac*sizeof(unsigned int *));
+
+  for(j=0;j<nfrac;j++)
+  {
+    gr[j] = (unsigned int *) malloc(iden.nobj*sizeof(unsigned int));
+    iden.r0[j]  = fof[j];
+    iden.r0[j] *= cbrt(cp.Mpart*1.0E10/cp.omegam/RHOCRIT)*1000.0f; //EN KPC
+
+    if(iden.r0[j] <= cp.soft)
+    {
+      fprintf(stdout,"cambia Linking length = %f \n",iden.r0[j]);
+      iden.r0[j] = cp.soft;
+    }
+
+    fprintf(stdout,"Linking length %d = %f \n",j,iden.r0[j]);
+  }
+
+  #ifdef LOCK
+    lock = (omp_lock_t *) malloc(iden.nobj*sizeof(omp_lock_t));
+  #endif
+  for(i=0;i<iden.nobj;i++)
+  {
+    #ifdef LOCK
+      omp_init_lock(&(lock[i]));
+    #endif
+    for(j=0; j<nfrac; j++)
+    {
+      gr[j][i] = i;
+    }
+  }
+
+  if(nfrac!=1)
+  {
+    i = (iden.r0[0]>iden.r0[nfrac-1]) ? 0 : nfrac-1; // ORDEN DECRECIENTE O CRECIENTE
+  }else{
+    i = 0;  
+  }
+
+  grid.ngrid = (long)(cp.lbox/iden.r0[i]);
 
   if(grid.ngrid > NGRIDMAX){
     fprintf(stdout,"Using NGRIDMAX = %d\n",NGRIDMAX);
     grid.ngrid = NGRIDMAX;
   }
-
+  
   grid.nobj = iden.nobj;
 
-  if(ngrid_old != grid.ngrid){
+  if(ngrid_old != grid.ngrid)
+  {
     grid_free();
     grid_init();
     grid_build();
   }
 
-  iden.r0 = iden.r0*iden.r0;
-
-  for(i = 0; i < iden.nobj; i++)
-    P[i].gr = 0;
+  for(i=0;i<nfrac;i++)
+    iden.r0[i] *= iden.r0[i];
 
   #ifdef NTHREADS
   omp_set_dynamic(0);
   omp_set_num_threads(NTHREADS);
   #endif
-
+    
   fprintf(stdout,"Comienza identificacion.....\n");
-  iden.ngrupos = 0;
+  fprintf(stdout,"\nRunning on %d threads\n",NTHREADS);
+  fflush(stdout);
 
-  ntotal = 0; ngrupo = 0;
-  my_real *zmin,*zmax;
-#pragma omp parallel default(none) reduction(+:ntotal) \
-  private(head,curr,nvec,tmp,tmp1,test,tid,i,zcm,nn,   \
-          curr_global_head,puntero,j,nthreads) \
-  shared(P,iden,global_head,cp,grupos_per_thread,ngrupo,zmin,zmax,stdout)                     
-{
-  tid = omp_get_thread_num();
+  #ifdef LOCK
+    #pragma omp parallel default(none) private(tid,i) \
+    shared(P,iden,cp,lock,stdout)   
+  #else
+    #pragma omp parallel default(none) private(tid,i) \
+    shared(P,iden,cp,stdout)   
+  #endif
+  {
+    tid = omp_get_thread_num(); 
 
-  nthreads = omp_get_num_threads();
-  //zmin = (my_real)tid*cp.lbox/(my_real)nthreads;
-  //zmax = (my_real)(tid+1)*cp.lbox/(my_real)nthreads;
+    for(i = tid*DIV_CEIL(iden.nobj,NTHREADS);
+    i<(tid==NTHREADS-1 ? iden.nobj : (tid+1)*DIV_CEIL(iden.nobj,NTHREADS));
+    i++)
+    //#pragma omp master
+    //for(i = 0; i<iden.nobj; i++)
+    {
+     
+      if(i%1000000==0) fprintf(stdout,"%u %u %.4f\n",tid,i,(float)i/(float)iden.nobj);
 
-  if(tid == 0){
-    my_int nhist = 160;
-    my_int *zhist;
-    my_real *zhist_lim;
-    zhist = (my_int *) calloc(nhist,sizeof(my_int));
-    zhist_lim = (my_real *) malloc(nhist*sizeof(my_real));
-    zmin = (my_real *) malloc(nthreads*sizeof(my_real));
-    zmax = (my_real *) malloc(nthreads*sizeof(my_real));
-
-    printf("\nRunning on %d threads\n",nthreads);
-    grupos_per_thread = (my_int *) malloc(nthreads*sizeof(my_int));
-    global_head = (struct global_head_st **) malloc(nthreads*sizeof(struct global_head_st *));
-
-//    my_real med,sig;
-//    for(j = 0; j < 3; j++){
-//      memset(zhist,0,nhist*sizeof(my_real));
-//      for(i = 0; i < iden.nobj; i++)
-//        zhist[(my_int)(P[i].Pos[j]/cp.lbox*(my_real)nhist)]++;
-//
-//      med = 0.;
-//      for(i = 0; i < nhist; i++){
-//        med += (my_real)zhist[i];
-//      }
-//      med /= (my_real)nhist;
-//      sig = 0.;
-//      for(i = 0; i < nhist; i++){
-//        sig += (my_real)((zhist[i]-med)*(zhist[i]-med));
-//      }
-//      sig /= (my_real)(nhist - 1);
-//      printf("%d %f %f\n",j,sqrt(sig),med);
-//    }
-
-    for(i = 0; i < iden.nobj; i++)
-      zhist[(my_int)(P[i].Pos[MY_DIM]/cp.lbox*(my_real)nhist)]++;
-
-    for(i = 0; i <= nhist; i++) zhist_lim[i] = (my_real)i*cp.lbox/(my_real)nhist;
-
-    my_int sum;
-    sum = 0;
-    for(j = 0, i = 0; j < nthreads; j++){
-      zmin[j] = zhist_lim[i];
-      while(1){
-        sum += zhist[i];
-        i++;
-        if((sum > (my_int)((my_real)(j+1)*(my_real)iden.nobj/(my_real)nthreads)) || (i >= nhist)){
-          break;
-        }
+      //#pragma omp taskgroup
+      #pragma omp task
+      {
+        busv(i);
       }
-      zmax[j] = zhist_lim[i];
     }
+
+  }  /****** TERMINA SECCION PARALELA ****************************/
+
+  fprintf(stdout,"Sale del paralelo\n"); fflush(stdout);
+
+  #ifdef LOCK
+  for(i=0;i<iden.nobj;i++) 
+    omp_destroy_lock(&(lock[i]));
+  free(lock);
+  #endif
+
+  for(j=0;j<nfrac;j++)
+  {
+    linkedlist(gr[j]);
+    Write_Groups(j);
+
+    free(Temp.head);
+    free(Temp.npgrup);
+    free(Temp.ll);
   }
 
-  #pragma omp barrier
-  test = (int *) calloc(iden.nobj/32 + 1,sizeof(int));
+  for(j=0;j<nfrac;j++)
+    free(gr[j]);
 
-  global_head[tid] = NULL;
-  for(i = 0; i < iden.nobj; i++){
-    if(TestBit(test,i))continue;
-    //if(P[i].Pos[2] < zmin || P[i].Pos[2] >= zmax) continue;
-    if(P[i].Pos[MY_DIM] < zmin[tid] || P[i].Pos[MY_DIM] >= zmax[tid]) continue;
-
-    SetBit(test,i);
-
-    head = (item *) malloc(sizeof(item));
-    head->indx = i;
-    head->next = NULL;
-
-    curr = head;
-    while(curr){
-      tmp = curr->next;
-      tmp1 = curr;
-
-      nvec = 0;
-      busv(&curr, &nvec, test);
-
-      curr->next = tmp;
-      curr = tmp1->next;
-    }
-
-    zcm = 0.0; nn = 0;
-    curr = head;
-    while(curr){
-      zcm += P[curr->indx].Pos[MY_DIM]; 
-      nn++;
-
-      curr = curr->next;
-    }
-    zcm /= (my_real)nn;
-
-    //if(zcm < zmin || zcm >= zmax || nn < NPARTMIN){
-    if(zcm < zmin[tid] || zcm >= zmax[tid] || nn < NPARTMIN){
-      curr = head;
-      while(curr){
-        puntero = curr->next;
-        free(curr);
-        curr = puntero;
-      }
-    }else{
-      ntotal++;
-      curr_global_head = (struct global_head_st *) malloc(sizeof(struct global_head_st));
-      assert(curr_global_head != NULL);
-      curr_global_head->head = head;
-      curr_global_head->global_next = global_head[tid];
-      global_head[tid] = curr_global_head;
-    }
-  }
-  grupos_per_thread[tid] = ntotal;
-  printf("tid %d ntotal %d\n",tid,ntotal);
-  free(test);
-  #pragma omp barrier
-
-  /***** RENOMBRA *****/
-  #pragma omp for schedule(dynamic)
-  for(tid = 0; tid < nthreads; tid++){
-    ntotal = 0;
-    curr_global_head = global_head[tid];
-    while(curr_global_head){
-      ntotal++;
-      head = curr_global_head->head;
-      if(P[head->indx].gr == 0){
-        #pragma omp critical
-        {ngrupo++;j = ngrupo;}
-        #ifdef DEBUG
-        i = 0;
-        #endif
-        curr = head;
-        while(curr){
-          #ifdef DEBUG
-          i++;
-          assert(P[curr->indx].gr == 0);
-          #endif
-          P[curr->indx].gr = j;
-          curr = curr->next;
-        }
-        #ifdef DEBUG
-        assert(i >= NPARTMIN);
-        #endif
-      }
-      curr_global_head = curr_global_head->global_next;
-    }
-    //assert(ntotal == grupos_per_thread[tid]);
-
-    curr_global_head = global_head[tid];
-    while(curr_global_head){
-      curr = curr_global_head->head;
-      while(curr){
-        puntero = curr->next;
-        free(curr);
-        curr = puntero;
-      }
-      puntero = curr_global_head->global_next;
-      free(curr_global_head);
-      curr_global_head = puntero;
-    }
-  }
-}
-  /****** TERMINA SECCION PARALELA ****************************/
-
-  /*Le sumamos 1 para contar el grupo 0*/
-  iden.ngrupos = ngrupo + 1;
-  free(global_head);
-  free(grupos_per_thread);
-  fprintf(stdout,"Nro. grupos identificados = %d\n",iden.ngrupos);
   fprintf(stdout,"Termino identificacion\n"); fflush(stdout);
+
 }
 
-void busv(item **curr, unsigned int *nvec, int *test){
-  long ixci, iyci, izci;
-  long ixcf, iycf, izcf;
-  long ix, iy, iz;
-  long ixx, iyy, izz;
-  long ibox,ngrid;
-  my_int i,ic,count;
-  my_real xx, yy, zz;
-  my_real dis;
-  my_real lbox,fac;
-  item *tmp, *clone;
-
-  clone = *curr;
-  ic = clone->indx;
-
-  ngrid = grid.ngrid;
-  lbox  = cp.lbox;
-  fac   = (my_real)ngrid/lbox;
-  #ifdef PERIODIC
-  my_real lbox2 = lbox/2.0;
-  #endif
-
-  ixcf = (long)(P[ic].Pos[0]*fac);
-  ixci = ixcf - 1;
-  ixcf = ixcf + 1;
-  iycf = (long)(P[ic].Pos[1]*fac);
-  iyci = iycf - 1;
-  iycf = iycf + 1;
-  izcf = (long)(P[ic].Pos[2]*fac);
-  izci = izcf - 1;
-  izcf = izcf + 1;
-
-  #ifndef PERIODIC
-  if( ixci < 0 ) ixci = 0;
-  if( iyci < 0 ) iyci = 0;
-  if( izci < 0 ) izci = 0;
-  if( ixcf >= ngrid ) ixcf = ngrid - 1;
-  if( iycf >= ngrid ) iycf = ngrid - 1;
-  if( izcf >= ngrid ) izcf = ngrid - 1;
-  #endif
-
-  count = 0;
-  for(ixx = ixci; ixx <= ixcf; ixx++){
-    ix = ixx;
-    #ifdef PERIODIC
-    if(ix >= ngrid) ix = ix - ngrid;
-    if(ix < 0) ix = ix + ngrid;
-    #endif
-    for( iyy = iyci ; iyy <= iycf ; iyy++){
-      iy = iyy;
-      #ifdef PERIODIC
-      if(iy >= ngrid) iy = iy - ngrid;
-      if(iy < 0) iy = iy + ngrid;
-      #endif
-
-      for( izz = izci ; izz <= izcf ; izz++){
-        iz = izz;
-        #ifdef PERIODIC
-        if(iz >= ngrid) iz = iz - ngrid;
-        if(iz < 0) iz = iz + ngrid;
-        #endif
-
-        ibox = (ix * ngrid + iy) * ngrid + iz ;
-
-        i = grid.llirst[ibox];
-        do{
-          #ifdef IDENSUB
-          if(P[i].sub == P[ic].sub){
-          #endif
-            if(!TestBit(test,i)){
-              xx = P[i].Pos[0] - P[ic].Pos[0];
-              yy = P[i].Pos[1] - P[ic].Pos[1];
-              zz = P[i].Pos[2] - P[ic].Pos[2];
-
-              #ifdef PERIODIC
-              if( xx >  lbox2 ) xx = xx - lbox;
-              if( yy >  lbox2 ) yy = yy - lbox;
-              if( zz >  lbox2 ) zz = zz - lbox;
-              if( xx < -lbox2 ) xx = xx + lbox;
-              if( yy < -lbox2 ) yy = yy + lbox;
-              if( zz < -lbox2 ) zz = zz + lbox;
-              #endif
-
-              dis = xx*xx + yy*yy + zz*zz;
-
-              if(dis < iden.r0){
-                SetBit(test,i);
-
-                tmp = (item *) malloc(sizeof(item));
-                #ifdef DEBUG
-                assert(tmp != NULL);
-                #endif
-
-                tmp->indx = i;
-                tmp->next = NULL;
-
-                clone->next = tmp;
-                clone = tmp;
-
-                count++;
-              }
-            }
-          #ifdef IDENSUB 
-          }
-          #endif
-          i = grid.ll[i];
-        }while(i != grid.llirst[ibox]); /*fin lazo particulas del grid*/
-      } /*fin izz*/
-    } /*fin iyy*/
-  } /*fin ixx*/
-
-  *curr = clone;
-  *nvec += count;
-}

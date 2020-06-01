@@ -1,95 +1,107 @@
-#include <stdint.h>
-
 #ifndef VARIABLES_H
 #define VARIABLES_H
 
 #ifndef POSFACTOR
-#define POSFACTOR 1.0
+  #define POSFACTOR 1.0
 #endif
 
 #ifndef VELFACTOR
-#define VELFACTOR 1.0
+  #define VELFACTOR 1.0
 #endif
-
-#define KERNEL_TABLE 10000
 
 #ifndef NPARTMIN
-#define NPARTMIN 20
+  #define NPARTMIN 20
 #endif
+
+#define N_part_types 6    /* Number of particle types */
 
 /* Precision del codigo (reales) */
 #ifdef PRECDOUBLE
-typedef double my_real;
+typedef double type_real;
 #else
-typedef float my_real;
+typedef float type_real;
 #endif
 
 /* Precision del codigo (enteros) */
 #ifdef LONGIDS
-typedef unsigned long my_int;
-#define GROUND UINT64_MAX
+typedef unsigned long long type_int;
 #else
-typedef unsigned int my_int;
-#define GROUND UINT32_MAX
+typedef unsigned int type_int;
 #endif
 
-size_t size_real;
-size_t size_int;
+#define RHOCRIT 2.77525E11   /* Densidad crítica del Universo [Msol h² / Mpc³] */
+#define GCONS 6.67300E-20    /* Constante de Gravitación [km³ / kg / seg²]     */
+#define Msol 1.9891E30       /* Masa del Sol [Kg]                              */
+#define Kpc 3.08568025E16    /* Kiloparsec -> Kilometro                        */  
+
+extern struct cosmoparam
+{
+  double   omegam      ;  /* Omega Materia                         */
+  double   omegal      ;  /* Omega Lambda                          */
+  double   omegak      ;  /* Omega Curvatura                       */
+  double   hparam      ;  /* Parámetro de Hubble adimensional      */
+  double   lbox        ;  /* Lado del box [Kpc / h]                */
+  double   Mpart       ;  /* Masa de la partícula [10^10 Msol / h] */
+  type_int npart       ;  /* Número de partículas                  */
+  double   redshift    ;  /* Redshift                              */
+  double   aexp        ;  /*                                       */
+  double   Hubble_a    ;  /*                                       */
+  double   soft        ;  /* Softening [kpc / h]                   */
+} cp;
+
+/* Input and output files */
+extern struct SnapST
+{
+  int nfiles;
+  char root[200], name[200];
+  int num;
+} snap;
+
+extern struct gridst
+{
+  unsigned long ngrid;
+  unsigned long nobj;
+  type_int *icell;
+} grid;
 
 /* Posiciones, velocidades y energias de las partículas */
-struct particle_data {
-  my_real Pos[3];
-  #ifdef STORE_VELOCITIES
-  my_real Vel[3];
-  #endif
-  #ifdef STORE_IDS
-  my_int  id;
-  #endif
-  //my_int  indx;
-  my_int  fof;
-  my_int  llfof;
-  #ifdef IDENSUB
-  my_int  sub;
-  my_int  llsub;
-  #endif
-  #ifdef ENERGIES
-  double  Ep, Ec;
-  #endif
-  my_int  gr;
-} *P;
+#ifdef COLUMN
 
-struct particles{
-  my_real Pos[3];
-  my_real Vel[3];
-  my_int  indx;
-  double  Ep, Ec;
-  bool bounded;
-};
+  extern struct particle_data 
+  {
+    type_real      *x;
+    type_real      *y;
+    type_real      *z;
+    #ifdef STORE_VELOCITIES
+    type_real      *vx;
+    type_real      *vy;
+    type_real      *vz;
+    #endif
+    #ifdef STORE_IDS
+    type_int       *id;
+    #endif
+  } P;
 
+#else
 
-struct grupos{
-  my_int llirst;
-  my_int np;
-} *fof, *sub, *groups;
-
-my_int np_in_fof;
-my_int np_in_sub;
-my_int n_grupos_fof;
-my_int n_grupos_sub;
-int  nfrac;
-char fof_file[200];
-char sub_file[200];
-
-void init_variables(int argc, char **argv);
+  extern struct particle_data 
+  {
+    type_real pos[3];
+    #ifdef STORE_VELOCITIES
+    type_real vel[3];
+    #endif
+    #ifdef STORE_IDS
+    type_int       id;
+    #endif
+  } *P;
 
 #endif
 
+extern type_int  nfrac;
+extern type_real *fof;
+extern char message[200];
+#ifdef CHANGE_POSITION
+  extern type_real pmin[3], pmax[3];
+#endif
 
-
-
-
-
-
-
-
-
+#endif

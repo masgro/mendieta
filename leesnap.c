@@ -1,53 +1,18 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include <assert.h>
-#include <stdbool.h>
 #include "variables.h"
-#include "cosmoparam.h"
+#include "allocate.h"
 #include "leesnap.h"
 #include "colores.h"
 
-void read_gadget(void){
-  char   filename[200];
-  int    ifile;
-  my_int ind;
-  size_t total_memory;
+static struct io_header header;
 
-  if(snap.nfiles>1)
-    sprintf(filename,"%s%s.0",snap.root,snap.name);
-  else
-    sprintf(filename,"%s%s",snap.root,snap.name);
-
-  leeheader(filename);
-
-  /****** ALLOCATACION TEMPORAL DE LAS PARTICULAS ****************/
-  total_memory = (float)cp.npart*sizeof(struct particle_data)/1024.0/1024.0/1024.0;
-  printf("Allocating %.5zu Gb for %lu particles\n",total_memory,(unsigned long)cp.npart);
-  P = (struct particle_data *) malloc(cp.npart*sizeof(struct particle_data));
-  assert(P != NULL);
-
-  /***** LEE POS Y VEL DE LAS PARTICULAS ***********************/
-  for(ifile = 0, ind = 0; ifile < snap.nfiles; ifile++){
-    if(snap.nfiles>1)
-      sprintf(filename,"%s%s.%d",snap.root,snap.name,ifile);
-    else
-      sprintf(filename,"%s%s",snap.root,snap.name);
-
-    lee(filename,P,&ind);
-  }
-
-#ifdef SUBBOXES
-  select_particles();
-#endif
-
-  fprintf(stdout,"End reading snapshot file(s)...\n"); fflush(stdout);
-}
-
-void leeheader(char *filename){
+static void leeheader(const char *filename)
+{
   FILE *pf;
-  int d1,d2;
-  size_t ierr;
+  type_int d1,d2;
 
   pf = fopen(filename,"r");
   if(pf == NULL){
@@ -55,16 +20,13 @@ void leeheader(char *filename){
     exit(EXIT_FAILURE);
   }
 
-  ierr = fread(&d1, sizeof(d1), 1, pf);
-  assert(ierr == 1);
-  ierr = fread(&header, sizeof(header), 1, pf);
-  assert(ierr == 1);
-  ierr = fread(&d2, sizeof(d2), 1, pf);
-  assert(ierr == 1);
+  fread(&d1, sizeof(d1), 1, pf);
+  fread(&header, sizeof(header), 1, pf);
+  fread(&d2, sizeof(d2), 1, pf);
   assert(d1==d2);
   fclose(pf);
 
-  /* Definicion estructura cosmoparam */
+  // Definicion estructura cosmoparam
   cp.omegam    = header.Omega0;
   cp.omegal    = header.OmegaLambda;
   cp.omegak    = 1.0 - cp.omegam - cp.omegal;
@@ -85,7 +47,7 @@ void leeheader(char *filename){
   printf("*********************************** \n");
   printf("*   Parametros de la simulacion   * \n");
   printf("*********************************** \n");
-  printf("  Numero de particulas = %lu\n",(unsigned long)cp.npart);
+  printf("  Numero de particulas = %u \n", cp.npart);
   printf("  Lado del box = %g \n", cp.lbox);
   printf("  Redshift = %g \n", cp.redshift);
   printf("  Omega Materia = %g \n", cp.omegam);
@@ -97,21 +59,19 @@ void leeheader(char *filename){
   printf("*********************************** \n");
 }
 
-void lee(char *filename, struct particle_data *Q, my_int *ind){
+static void lee(const char *filename, type_int * restrict ind)
+{
   FILE *pf;
-  int d1, d2;
-  int k, pc, n;
-  size_t ierr;
+  type_int d1, d2;
+  type_int k, pc, n;
 
-  my_real r[3],v[3];
-  #ifdef STORE_IDS
-  my_int id;
+  type_real r[3];
+  #ifdef STORE_VELOCITIES
+  type_real v[3];
   #endif
- 
-  for(k = 0; k < 3; k++){
-    pmin[k] = 1.E26; 
-    pmax[k] = -1.E26;
-  }
+  #ifdef STORE_IDS
+  type_int id;
+  #endif
 
   pf = fopen(filename,"r");
   if(pf == NULL){
@@ -121,51 +81,65 @@ void lee(char *filename, struct particle_data *Q, my_int *ind){
 
   fprintf(stdout,"Reading file: %s \n",filename); fflush(stdout);
 
-  ierr = fread(&d1, sizeof(d1), 1, pf);
-  assert(ierr == 1);
-  ierr = fread(&header, sizeof(header), 1, pf);
-  assert(ierr == 1);
-  ierr = fread(&d2, sizeof(d2), 1, pf);
-  assert(ierr == 1);
+  fread(&d1, sizeof(d1), 1, pf);
+  fread(&header, sizeof(header), 1, pf);
+  fread(&d2, sizeof(d2), 1, pf);
   assert(d1==d2);
 
-  ierr = fread(&d1, sizeof(d1), 1, pf);
-  assert(ierr == 1);
-  for(k = 0, pc = 0; k < 6; k++){
+  fread(&d1, sizeof(d1), 1, pf);
+  for(k = 0, pc = *ind; k < N_part_types; k++){
     for(n = 0; n < header.npart[k]; n++){
-      ierr = fread(&r[0], size_real, 3, pf);
-      assert(ierr == 3);
+      fread(&r[0], sizeof(type_real), 3, pf);
       if(k == 1){ /*ONLY KEEP DARK MATTER PARTICLES*/
-        Q[*ind+pc].Pos[0] = r[0]*POSFACTOR;
-        Q[*ind+pc].Pos[1] = r[1]*POSFACTOR;
-        Q[*ind+pc].Pos[2] = r[2]*POSFACTOR;
-            
-        if(Q[*ind+pc].Pos[0] > pmax[0]) pmax[0] = Q[*ind+pc].Pos[0];
-        if(Q[*ind+pc].Pos[0] < pmin[0]) pmin[0] = Q[*ind+pc].Pos[0];
-        if(Q[*ind+pc].Pos[1] > pmax[1]) pmax[1] = Q[*ind+pc].Pos[1];
-        if(Q[*ind+pc].Pos[1] < pmin[1]) pmin[1] = Q[*ind+pc].Pos[1];
-        if(Q[*ind+pc].Pos[2] > pmax[2]) pmax[2] = Q[*ind+pc].Pos[2];
-        if(Q[*ind+pc].Pos[2] < pmin[2]) pmin[2] = Q[*ind+pc].Pos[2];
+      #ifdef COLUMN
+        P.x[pc] = r[0]*POSFACTOR;
+        P.y[pc] = r[1]*POSFACTOR;
+        P.z[pc] = r[2]*POSFACTOR;
 
+#ifdef CHANGE_POSITION
+        if(P.x[pc] > pmax[0]) pmax[0] = P.x[pc];
+        if(P.x[pc] < pmin[0]) pmin[0] = P.x[pc];
+        if(P.y[pc] > pmax[1]) pmax[1] = P.y[pc];
+        if(P.y[pc] < pmin[1]) pmin[1] = P.y[pc];
+        if(P.z[pc] > pmax[2]) pmax[2] = P.z[pc];
+        if(P.z[pc] < pmin[2]) pmin[2] = P.z[pc];
+#endif
+      #else
+        P[pc].pos[0] = r[0]*POSFACTOR;
+        P[pc].pos[1] = r[1]*POSFACTOR;
+        P[pc].pos[2] = r[2]*POSFACTOR;
+
+#ifdef CHANGE_POSITION
+        if(P[pc].pos[0] > pmax[0]) pmax[0] = P[pc].pos[0];
+        if(P[pc].pos[0] < pmin[0]) pmin[0] = P[pc].pos[0];
+        if(P[pc].pos[1] > pmax[1]) pmax[1] = P[pc].pos[1];
+        if(P[pc].pos[1] < pmin[1]) pmin[1] = P[pc].pos[1];
+        if(P[pc].pos[2] > pmax[2]) pmax[2] = P[pc].pos[2];
+        if(P[pc].pos[2] < pmin[2]) pmin[2] = P[pc].pos[2];
+#endif
+      #endif
         pc++;
       }
     }
   }
-  ierr = fread(&d2, sizeof(d2), 1, pf);
-  assert(ierr == 1);
+  fread(&d2, sizeof(d2), 1, pf);
   assert(d1==d2);
 
-  ierr = fread(&d1, sizeof(d1), 1, pf);
-  assert(ierr == 1);
+  fread(&d1, sizeof(d1), 1, pf);
 #ifdef STORE_VELOCITIES
-  for(k = 0, pc = 0; k < 6; k++){
+  for(k = 0, pc = *ind; k < N_part_types; k++){
     for(n = 0; n < header.npart[k]; n++){
-      ierr = fread(&v[0], size_real, 3, pf);
-      assert(ierr == 3);
+      fread(&v[0], sizeof(type_real), 3, pf);
       if(k == 1){ /*ONLY KEEP DARK MATTER PARTICLES*/
-        Q[*ind+pc].Vel[0] = v[0]*VELFACTOR;
-        Q[*ind+pc].Vel[1] = v[1]*VELFACTOR;
-        Q[*ind+pc].Vel[2] = v[2]*VELFACTOR;
+      #ifdef COLUMN        
+        P.vx[pc] = v[0]*VELFACTOR;
+        P.vy[pc] = v[1]*VELFACTOR;
+        P.vz[pc] = v[2]*VELFACTOR;
+      #else
+        P[pc].vel[0] = v[0]*VELFACTOR;
+        P[pc].vel[1] = v[1]*VELFACTOR;
+        P[pc].vel[2] = v[2]*VELFACTOR;
+      #endif
         pc++;
       }
     }
@@ -173,19 +147,20 @@ void lee(char *filename, struct particle_data *Q, my_int *ind){
 #else
   fseek(pf,d1,SEEK_CUR);
 #endif
-  ierr = fread(&d2, sizeof(d2), 1, pf);
-  assert(ierr == 1);
+  fread(&d2, sizeof(d2), 1, pf);
   assert(d1==d2);
 
-  ierr = fread(&d1, sizeof(d1), 1, pf);
-  assert(ierr == 1);
+  fread(&d1, sizeof(d1), 1, pf);
 #ifdef STORE_IDS
-  for(k = 0, pc = 0; k < 6; k++){
+  for(k = 0, pc = *ind; k < N_part_types; k++){
     for(n = 0; n < header.npart[k]; n++){
-      ierr = fread(&id, size_int, 1, pf);
-      assert(ierr == 1);
+      fread(&id, sizeof(type_int), 1, pf);
       if(k == 1){ /*ONLY KEEP DARK MATTER PARTICLES*/
-        Q[*ind+pc].id = id;
+      #ifdef COLUMN
+        P.id[pc] = id;
+      #else
+        P[pc].id = id;
+      #endif
         pc++;
       }
     }
@@ -193,82 +168,89 @@ void lee(char *filename, struct particle_data *Q, my_int *ind){
 #else
   fseek(pf,d1,SEEK_CUR);
 #endif
-  ierr = fread(&d2, sizeof(d2), 1, pf);
-  assert(ierr == 1);
+  fread(&d2, sizeof(d2), 1, pf);
   assert(d1==d2);
 
-  *ind += pc;
+  *ind = pc;
   
   fclose(pf);
 }
 
-void change_positions(my_int n){
-  my_int ip;
+extern void read_gadget(void)
+{
+  char filename[200];
+  type_int ifile, ind;
+  size_t total_memory;
 
-  RED("Inicio Change Positions\n");
+#ifdef CHANGE_POSITION
+  for(ind = 0; ind < 3; ind++)
+  {
+    pmin[ind] =  1.E26; 
+    pmax[ind] = -1.E26;
+  }
+#endif
 
-  for(int idim = 0; idim < 3; idim++){
-    pmin[idim] = 1.E26; 
-    pmax[idim] = -1.E26;
+  if(snap.nfiles>1)
+    sprintf(filename,"%s%s.0",snap.root,snap.name);
+  else
+    sprintf(filename,"%s%s",snap.root,snap.name);
+
+  leeheader(filename);
+
+  /****** ALLOCATACION TEMPORAL DE LAS PARTICULAS ****************/
+  total_memory = (float)cp.npart*sizeof(struct particle_data)/1024.0/1024.0/1024.0;
+  printf("Allocating %.5zu Gb for %u particles\n",total_memory,cp.npart);
+  if(!allocate_particles(&P, cp.npart))  exit(1);
+
+  /***** LEE POS Y VEL DE LAS PARTICULAS ***********************/
+  for(ifile = 0, ind = 0; ifile < snap.nfiles; ifile++)
+  {
+    if(snap.nfiles>1)
+      sprintf(filename,"%s%s.%d",snap.root,snap.name,ifile);
+    else
+      sprintf(filename,"%s%s",snap.root,snap.name);
+
+    lee(filename,&ind);
   }
 
-  for(ip = 0; ip < n; ip++){
-    if(P[ip].Pos[0] > pmax[0]) pmax[0] = P[ip].Pos[0];
-    if(P[ip].Pos[0] < pmin[0]) pmin[0] = P[ip].Pos[0];
-    if(P[ip].Pos[1] > pmax[1]) pmax[1] = P[ip].Pos[1];
-    if(P[ip].Pos[1] < pmin[1]) pmin[1] = P[ip].Pos[1];
-    if(P[ip].Pos[2] > pmax[2]) pmax[2] = P[ip].Pos[2];
-    if(P[ip].Pos[2] < pmin[2]) pmin[2] = P[ip].Pos[2];
-  }
+  cp.lbox *= POSFACTOR;
+
+  fprintf(stdout,"cp.lbox %f....\n",cp.lbox);
+  fprintf(stdout,"End reading snapshot file(s)...\n"); fflush(stdout);
+}
+
+#ifdef CHANGE_POSITION
+
+extern void change_positions(type_int n)
+{
+  type_int ip;
 
   printf("xmin %.1f xmax %.1f\n",pmin[0],pmax[0]);
   printf("ymin %.1f ymax %.1f\n",pmin[1],pmax[1]);
   printf("zmin %.1f zmax %.1f\n",pmin[2],pmax[2]);
 
-  for(ip = 0; ip < n; ip++)
-    for(int idim = 0; idim < 3; idim++)
-      P[ip].Pos[idim] -= pmin[idim];
+  for(ip=0;ip<n;ip++)
+  {
+#ifdef COLUMN
+    P.x[ip] -= pmin[0];
+    P.y[ip] -= pmin[1];
+    P.z[ip] -= pmin[2];
+#else
+    P[ip].pos[0] -= pmin[0];
+    P[ip].pos[1] -= pmin[1];
+    P[ip].pos[2] -= pmin[2];
+#endif
+  }
 
-  cp.lbox = pmax[0] - pmin[0];
-  for(int idim = 1; idim < 3; idim++)
-    if(cp.lbox < (pmax[idim] - pmin[idim])) cp.lbox = (pmax[idim] - pmin[idim]);
+  cp.lbox = 0.0f;
+  for(ip = 0; ip < 3; ip++)
+    if(cp.lbox < (pmax[ip] - pmin[ip])) 
+      cp.lbox = (pmax[ip] - pmin[ip]);
 
   cp.lbox *= 1.001;
+
   fprintf(stdout,"Changing cp.lbox %f....\n",cp.lbox);
-  GREEN("Fin Change Positions\n");
+
 }
 
-void re_change_positions(my_int n, struct particle_data *Q){
-  my_int ip;
-  for(ip = 0; ip < n; ip++)
-    for(int idim = 0; idim < 3; idim++)
-      Q[ip].Pos[idim] += pmin[idim];
-}
-
-void select_particles(void){
-  my_int i,j;
-
-  fprintf(stdout,"Selecting particles within a subbox\n"); fflush(stdout);
-  
-  for(j = 0, i = 0; i < cp.npart; i++){
-    if((P[i].Pos[0] - box.cen[0]) >  cp.lbox/2.0) P[i].Pos[0] -= (my_real)cp.lbox;
-    if((P[i].Pos[0] - box.cen[0]) < -cp.lbox/2.0) P[i].Pos[0] += (my_real)cp.lbox;
-    if((P[i].Pos[1] - box.cen[1]) >  cp.lbox/2.0) P[i].Pos[1] -= (my_real)cp.lbox;
-    if((P[i].Pos[1] - box.cen[1]) < -cp.lbox/2.0) P[i].Pos[1] += (my_real)cp.lbox;
-    if((P[i].Pos[2] - box.cen[2]) >  cp.lbox/2.0) P[i].Pos[2] -= (my_real)cp.lbox;
-    if((P[i].Pos[2] - box.cen[2]) < -cp.lbox/2.0) P[i].Pos[2] += (my_real)cp.lbox;
-
-    ///////////////////////////////////////////////////
-    if(P[i].Pos[0] < (box.cen[0]-(box.lado+box.franja)) || 
-       P[i].Pos[0] > (box.cen[0]+(box.lado+box.franja)))continue;
-    if(P[i].Pos[1] < (box.cen[1]-(box.lado+box.franja)) || 
-       P[i].Pos[1] > (box.cen[1]+(box.lado+box.franja)))continue;
-    if(P[i].Pos[2] < (box.cen[2]-(box.lado+box.franja)) || 
-       P[i].Pos[2] > (box.cen[2]+(box.lado+box.franja)))continue;
-    ///////////////////////////////////////////////////
-
-    j++;
-  }
-  cp.npart = j;
-  P = (struct particle_data *) realloc(P,cp.npart*sizeof(struct particle_data));
-}
+#endif

@@ -1,37 +1,30 @@
 #ifndef PROP_H
 #define PROP_H
 
-#include <gsl/gsl_matrix.h>
+#ifndef VARIABLES_H
+  #include "variables.h"
+#endif
 
 struct propiedades_st
 {
-  int        npart;
-  my_real  pcm[3], vcm[3], sig[3], mostbound[3];
-  my_real  r200, m200, v200;
-  my_real  rvir, mvir, vvir;
-  my_real  vmax;
-  my_real  L[3]; 
-  my_real  Ep, Ec, lambda;
-  my_real  aa, bb, cc;
-  my_real  aa_vel, bb_vel, cc_vel;
-  gsl_matrix *evec;
-  gsl_matrix *evec_vel;
+  type_int   npart;
+  type_real  *pos;
+  type_real  pcm[3];
+  type_real  aa, bb, cc;
+  type_real  evec[3][3];
+#ifdef STORE_VELOCITIES  
+  type_real  *vel;
+  type_real  vcm[3], sig[3], mostbound[3];
+  type_real  r200, m200, v200;
+  type_real  rvir, mvir, vvir;
+  type_real  vmax;
+  type_real  L[3]; 
+  type_real  Ep, Ec, lambda;
+  type_real  aa_vel, bb_vel, cc_vel;
+  type_real  evec_vel[3][3];
+#endif
 };
 
-struct node
-{
-  int indx;
-  struct node *next;
-};
+extern void propiedades(struct propiedades_st *Prop);
 
-struct stuff
-{
-  struct node *first;
-  unsigned int np;
-} *groups;
-
-
-struct propiedades_st propiedades(struct particle_data *P, struct grupos *g, int gid);
-void forma(char *flag, struct particle_data *Q, struct propiedades_st Prop);
-void write_properties(FILE *pfout, struct propiedades_st Prop);
 #endif

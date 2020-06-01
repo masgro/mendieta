@@ -2,10 +2,10 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdbool.h>
-#include "cosmoparam.h"
+#include "variables.h"
 #include "deltas.h"
 
-double deltavir( double z )
+extern double deltavir( const double z )
 {
   double q ;
   double as, x ;

@@ -1,6 +1,6 @@
 #ifndef DELTAS_H
 #define DELTAS_H
 
-double deltavir( double z );
+extern double deltavir( const double z );
 
 #endif
