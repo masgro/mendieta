@@ -13,6 +13,10 @@
   #define NPARTMIN 20
 #endif
 
+#ifndef FOF_OVERDENSITY
+  #define FOF_OVERDENSITY 200
+#endif
+
 #define N_part_types 6    /* Number of particle types */
 
 /* Precision del codigo (reales) */

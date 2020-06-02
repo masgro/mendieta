@@ -4,10 +4,11 @@ EXTRAS += -DPERIODIC    #periodic boundary condition
 #EXTRAS += -DLONGIDS            #IDs are long integer
 EXTRAS += -DPOSFACTOR=1000.0    #Positions in Kpc/h
 #EXTRAS += -DVELFACTOR=1.0      #Velocities in km/s
-#EXTRAS += -DSTORE_VELOCITIES
+EXTRAS += -DSTORE_VELOCITIES
 EXTRAS += -DSTORE_IDS
 #EXTRAS += -DCOLUMN
 EXTRAS += -DFILE_ASCII
+#EXTRAS += -DREAD_LEVELS
 
 #CC
 CC     := $(OMPP) gcc $(DOMPP)
