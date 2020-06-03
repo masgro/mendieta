@@ -17,6 +17,10 @@
   #define FOF_OVERDENSITY 200
 #endif
 
+#ifndef NCUT
+  #define NCUT 2
+#endif
+
 #define N_part_types 6    /* Number of particle types */
 
 /* Precision del codigo (reales) */

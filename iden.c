@@ -227,7 +227,11 @@ static void linkedlist(type_int * restrict ar)
     {
       ar[i] = Temp.ll[ar[i]] - NPARTMIN;
     }else{
+#ifdef COLUMN
+      P.sub[i] = ar[i] = 0;
+#else
       P[i].sub = ar[i] = 0;
+#endif
     }
 
     g = ar[i];
@@ -425,15 +429,11 @@ static void Write_Groups(const type_int niv)
 
 extern void identification(void)
 {
-  const type_int ncut = 1;
   type_int i, j, step, tid;
 
-  for(step=0;step<DIV_CEIL(nfrac,ncut);step++)
+  for(step=0;step<DIV_CEIL(nfrac,NCUT);step++)
   {
-    if(nfrac%ncut == 0)
-      nstep = ncut;
-    else
-      nstep = step == DIV_CEIL(nfrac,ncut) - 1 ? nfrac-ncut*step : ncut;
+    nstep = step == DIV_CEIL(nfrac,NCUT) - 1 ? nfrac-NCUT*step : NCUT;
 
     fprintf(stdout,"\n%d Step - %d Levels\n",step,nstep);
 
@@ -444,7 +444,7 @@ extern void identification(void)
     for(j=0;j<nstep;j++)
     {
       gr[j] = (type_int *) malloc(iden.nobj*sizeof(type_int));
-      iden.r0[j]  = fof[ncut*step+j];
+      iden.r0[j]  = fof[NCUT*step+j];
       iden.r0[j] *= cbrt(cp.Mpart*1.0E10/cp.omegam/RHOCRIT)*1000.0f; //EN KPC
 
       if(iden.r0[j] <= cp.soft)
@@ -535,7 +535,7 @@ extern void identification(void)
     for(j=0;j<nstep;j++)
     {
       linkedlist(gr[j]);
-      Write_Groups(ncut*step+j);
+      Write_Groups(NCUT*step+j);
 
       free(gr[j]);
       free(Temp.ll);
